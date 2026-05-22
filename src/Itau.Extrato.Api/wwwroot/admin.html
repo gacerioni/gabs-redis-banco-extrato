@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Itaú · Admin (PoV Redis)</title>
+<style>
+  :root {
+    --itau-orange: #EC7000;
+    --itau-orange-dark: #C25A00;
+    --itau-orange-light: #FFB873;
+    --itau-orange-bg: #FFF4E5;
+    --itau-blue: #003C8F;
+    --bg: #F4F4F4;
+    --card: #FFFFFF;
+    --border: #E5E5E5;
+    --text: #2B2B2B;
+    --muted: #6B6B6B;
+    --muted-2: #9A9A9A;
+    --green: #008C3F;
+    --green-bg: #E8F5EC;
+    --red: #C8102E;
+    --red-bg: #FBEBEE;
+    --blue: #1A73E8;
+    --blue-bg: #E8F0FE;
+    --shadow: 0 2px 8px rgba(0,0,0,0.06);
+    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, "Segoe UI", "Helvetica Neue", Roboto, system-ui, sans-serif; }
+
+  header {
+    background: var(--itau-orange);
+    color: white;
+    padding: 12px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  header .logo-pill { background: white; border-radius: 8px; padding: 4px 10px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  header .logo-pill img { height: 28px; }
+  header h1 { margin: 0; font-size: 17px; font-weight: 500; }
+  header .pov-badge { background: rgba(0,0,0,0.18); border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+  header .spacer { flex: 1; }
+  header .links a {
+    color: white;
+    background: rgba(255,255,255,0.18);
+    padding: 6px 14px;
+    border-radius: 18px;
+    text-decoration: none;
+    font-size: 13px;
+  }
+  header .links a:hover { background: rgba(255,255,255,0.28); }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 28px 48px;
+  }
+  .page-intro { margin-bottom: 24px; }
+  .page-intro h2 { margin: 0 0 6px 0; font-size: 20px; color: var(--itau-blue); }
+  .page-intro p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 760px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+    border-left: 3px solid var(--itau-orange);
+  }
+  .card.stats   { border-left-color: var(--green); }
+  .card.settings{ border-left-color: var(--itau-orange); }
+  .card.actions { border-left-color: var(--red); }
+  .card.about   { border-left-color: var(--blue); grid-column: 1 / -1; }
+  .card h3 {
+    margin: 0 0 14px 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* Stats card */
+  .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .k { color: var(--muted); font-size: 13px; font-family: var(--mono); }
+  .stat-row .v { font-family: var(--mono); font-weight: 600; font-size: 14px; }
+
+  /* Settings card */
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .field input[type=range] { width: 100%; }
+  .field .range-row { display: flex; align-items: center; gap: 12px; }
+  .field .range-row input[type=range] { flex: 1; accent-color: var(--itau-orange); }
+  .field .range-value {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--itau-orange-dark);
+    background: var(--itau-orange-bg);
+    border-radius: 4px;
+    padding: 4px 10px;
+    min-width: 80px;
+    text-align: center;
+  }
+  .field .pill-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .field .pill-group button {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 18px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .field .pill-group button.active {
+    background: var(--itau-orange);
+    border-color: var(--itau-orange);
+    color: white;
+    font-weight: 600;
+  }
+  .field .hint { font-size: 12px; color: var(--muted-2); margin-top: 6px; font-style: italic; }
+  .save-btn {
+    background: var(--itau-orange);
+    color: white;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+  .save-btn:hover { background: var(--itau-orange-dark); }
+  .save-btn:disabled { background: var(--muted-2); cursor: not-allowed; }
+
+  /* Actions */
+  .action-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .action-row:last-child { border-bottom: none; }
+  .action-row .desc { flex: 1; }
+  .action-row .desc .title { font-weight: 500; font-size: 14px; }
+  .action-row .desc .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .action-row button {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .action-row button.danger { color: var(--red); border-color: var(--red); }
+  .action-row button.danger:hover { background: var(--red-bg); }
+  .action-row button:hover { border-color: var(--itau-orange); }
+
+  /* About / Architecture */
+  .arch-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .arch-card {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 14px 16px;
+    border-top: 3px solid var(--muted);
+  }
+  .arch-card.r1 { border-top-color: var(--green); }
+  .arch-card.r2 { border-top-color: var(--itau-orange); }
+  .arch-card.r3 { border-top-color: var(--green); }
+  .arch-card h4 { margin: 0 0 8px 0; font-size: 13px; }
+  .arch-card p { margin: 0 0 6px 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .arch-card code {
+    background: white;
+    color: var(--itau-orange-dark);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+    border: 1px solid var(--border);
+  }
+  .arch-card .lat {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--green);
+    margin-top: 8px;
+    display: block;
+  }
+  .arch-card.r2 .lat { color: var(--itau-orange-dark); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 22px;
+    right: 22px;
+    background: var(--text);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.2s;
+    z-index: 1000;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { background: var(--green); }
+  .toast.danger { background: var(--red); }
+
+  /* Pill */
+  .pill {
+    display: inline-block;
+    background: var(--green-bg);
+    color: var(--green);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-family: var(--mono);
+    font-weight: 600;
+  }
+  .pill.warn { background: var(--itau-orange-bg); color: var(--itau-orange-dark); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-pill"><img src="/assets/itau-logo.svg" alt="Itaú"></div>
+  <h1>Painel admin · Busca de Extrato</h1>
+  <span class="pov-badge">PoV</span>
+  <div class="spacer"></div>
+  <div class="links">
+    <a href="/index.html">← voltar à busca</a>
+  </div>
+</header>
+
+<main>
+
+  <div class="page-intro">
+    <h2>Configurações da Proof of Value</h2>
+    <p>
+      Este painel deixa você brincar com a stack <b>sem rebuild</b>: muda TTL do cache em vivo, limpa estado, vê
+      contagens. A ideia é o time do Itaú abrir aqui durante a demo e <b>sentir as alavancas</b> que o Redis oferece —
+      enquanto o painel da direita, na busca, narra cada operação em milissegundos.
+    </p>
+  </div>
+
+  <div class="grid">
+
+    <!-- ============================== Stats ============================== -->
+    <div class="card stats">
+      <h3>📊 Estatísticas Redis</h3>
+      <div class="stat-row">
+        <span class="k"><code>idx:transactions</code></span>
+        <span class="v" id="stat-tx">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="k"><code>dict:autocomplete</code></span>
+        <span class="v" id="stat-sugg">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="k">cache de rewrite (<code>rewrite:*</code>)</span>
+        <span class="v" id="stat-cache">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="k">Redis em uso</span>
+        <span class="v" id="stat-redis">—</span>
+      </div>
+      <button class="save-btn" style="margin-top: 14px;" onclick="loadStats()">↻ atualizar</button>
+    </div>
+
+    <!-- ============================== Settings ============================== -->
+    <div class="card settings">
+      <h3>⚙ Configurações</h3>
+
+      <div class="field">
+        <label>TTL do cache de rewrite (segundos)</label>
+        <div class="range-row">
+          <input type="range" id="ttl-slider" min="30" max="3600" step="30" value="300" />
+          <span class="range-value" id="ttl-display">300s</span>
+        </div>
+        <div class="hint">
+          Quanto tempo o resultado do LLM rewrite fica em <code>rewrite:{hash}</code>. Default 5min — o sistema
+          financeiro brasileiro é rápido (Pix, débito automático), 24h seria excesso.
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Modo default (quando o classifier não tem certeza)</label>
+        <div class="pill-group" id="mode-group">
+          <button data-mode="auto">🤖 auto (recomendado)</button>
+          <button data-mode="keyword">🚀 keyword</button>
+          <button data-mode="natural">🧠 natural language</button>
+          <button data-mode="semantic">🔍 semantic VSS</button>
+        </div>
+        <div class="hint">
+          <b>auto</b>: triage por regex (0 ms) decide entre keyword e natural.
+          <b>semantic</b>: força VSS em toda query (embed + KNN), opt-in pra comparativo.
+        </div>
+      </div>
+
+      <button class="save-btn" id="save-settings">salvar</button>
+    </div>
+
+    <!-- ============================== Actions ============================== -->
+    <div class="card actions">
+      <h3>🧨 Ações de demo</h3>
+      <div class="action-row">
+        <div class="desc">
+          <div class="title">Limpar cache de rewrite</div>
+          <div class="sub"><code>DEL rewrite:*</code> — útil pra mostrar a 1ª chamada lenta de novo.</div>
+        </div>
+        <button class="danger" onclick="clearCache()">limpar cache</button>
+      </div>
+      <div class="action-row">
+        <div class="desc">
+          <div class="title">Forçar re-seed das transações</div>
+          <div class="sub">apaga e re-gera ~1300 lançamentos com dados frescos. Demora ~30-40 s.</div>
+        </div>
+        <button class="danger" onclick="forceReseed()">re-seedar</button>
+      </div>
+    </div>
+
+    <!-- ============================== Architecture ============================== -->
+    <div class="card about">
+      <h3>🏗 Arquitetura · 3 caminhos</h3>
+      <div class="arch-grid">
+        <div class="arch-card r1">
+          <h4>🚀 Caminho 1 — Redis-only (95% das queries)</h4>
+          <p>Query simples (<code>uber</code>, <code>luz</code>, <code>ifood</code>) → <code>FT.SEARCH</code> com <code>FT.SYNUPDATE</code> (sinônimos PT-BR nativos), filter por TAG <code>user_id</code>, sort por NUMERIC <code>date</code>, expansão de fuzzy via <code>FT.SUGGET</code>.</p>
+          <p>Tudo em um único roundtrip no protocolo RESP. Sem chamada a OpenAI. Sem custo.</p>
+          <span class="lat">latência: 1–10 ms wall</span>
+        </div>
+        <div class="arch-card r2">
+          <h4>🧠 Caminho 2 — LLM rewrite (1ª vez)</h4>
+          <p>Query long-tail (<code>"piques pra Dua esse mês"</code>) → <code>QueryClassifier</code> regex detecta NL → OpenAI <code>chat/completions</code> com <code>response_format=json_schema</code> extrai <code>{type, direction, counterparty, date_from, date_to, amount_min, amount_max}</code> → <code>FT.SEARCH</code> com filtros estruturados.</p>
+          <span class="lat">latência: 1.5–2 s wall (95% é OpenAI)</span>
+        </div>
+        <div class="arch-card r3">
+          <h4>✨ Caminho 3 — Cached rewrite</h4>
+          <p>Resultado do LLM rewrite vai pro Redis em <code>JSON.SET rewrite:{sha256(query)}</code> com TTL configurável. Próxima vez que a mesma query (ou idêntica após normalização) chegar, <code>JSON.GET</code> resolve em &lt;1 ms — <b>OpenAI nem é chamada</b>.</p>
+          <span class="lat">latência: 5–10 ms wall · 1600× speedup</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const toast = $("toast");
+
+  function showToast(text, kind = "success") {
+    toast.textContent = text;
+    toast.className = "toast show " + kind;
+    setTimeout(() => toast.classList.remove("show"), 2500);
+  }
+
+  // ----------- Stats -----------
+  async function loadStats() {
+    try {
+      const [stats, redis] = await Promise.all([
+        fetch("/api/admin/stats").then(r => r.json()),
+        fetch("/api/redis/info").then(r => r.json()),
+      ]);
+      $("stat-tx").textContent = (stats.idx_transactions ?? 0).toLocaleString("pt-BR") + " docs";
+      $("stat-sugg").textContent = (stats.dict_autocomplete ?? 0).toLocaleString("pt-BR") + " termos";
+      const cacheEntries = stats.rewrite_cache_entries ?? 0;
+      $("stat-cache").innerHTML = cacheEntries.toLocaleString("pt-BR") + " entries" +
+        (cacheEntries > 0 ? ` <span class="pill">economizando OpenAI</span>` : "");
+      const dep = redis.deployment === "redis_cloud"
+        ? (redis.region ? `Redis Cloud · ${redis.region}` : "Redis Cloud")
+        : `local · ${redis.host}:${redis.port}`;
+      $("stat-redis").innerHTML = `<span class="pill ${redis.deployment === 'redis_cloud' ? 'warn' : ''}">${dep}</span> v${redis.version}`;
+    } catch (e) {
+      console.error(e);
+      showToast("Falha ao carregar estatísticas", "danger");
+    }
+  }
+
+  // ----------- Settings -----------
+  let currentMode = "auto";
+
+  function fmtTtl(s) {
+    if (s < 60) return `${s}s`;
+    if (s < 3600) return `${Math.floor(s/60)}min ${s%60 > 0 ? (s%60)+"s" : ""}`.trim();
+    return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}min`;
+  }
+
+  async function loadSettings() {
+    try {
+      const r = await fetch("/api/admin/settings");
+      const d = await r.json();
+      const slider = $("ttl-slider");
+      slider.value = d.rewrite_ttl_sec;
+      $("ttl-display").textContent = fmtTtl(d.rewrite_ttl_sec);
+      currentMode = d.default_mode;
+      document.querySelectorAll("#mode-group button").forEach(b => {
+        b.classList.toggle("active", b.dataset.mode === currentMode);
+      });
+    } catch { showToast("Falha ao carregar settings", "danger"); }
+  }
+
+  $("ttl-slider").addEventListener("input", e => {
+    $("ttl-display").textContent = fmtTtl(parseInt(e.target.value, 10));
+  });
+
+  document.querySelectorAll("#mode-group button").forEach(b => {
+    b.addEventListener("click", () => {
+      currentMode = b.dataset.mode;
+      document.querySelectorAll("#mode-group button").forEach(x => x.classList.toggle("active", x === b));
+    });
+  });
+
+  $("save-settings").addEventListener("click", async () => {
+    const ttl = parseInt($("ttl-slider").value, 10);
+    try {
+      const r = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rewrite_ttl_sec: ttl, default_mode: currentMode }),
+      });
+      const d = await r.json();
+      showToast(`Settings salvas: TTL=${fmtTtl(d.rewrite_ttl_sec)} · modo=${d.default_mode}`);
+    } catch { showToast("Falha ao salvar", "danger"); }
+  });
+
+  // ----------- Actions -----------
+  window.clearCache = async () => {
+    if (!confirm("Limpar todas as entradas de rewrite cache?")) return;
+    try {
+      const r = await fetch("/api/admin/clear-cache", { method: "POST" });
+      const d = await r.json();
+      showToast(`${d.deleted} entries removidas — próximas queries vão re-chamar o LLM`);
+      loadStats();
+    } catch { showToast("Falha ao limpar cache", "danger"); }
+  };
+
+  window.forceReseed = async () => {
+    if (!confirm("Apagar todas as transações e gerar novamente? (~30-40s)")) return;
+    showToast("Re-seedando… aguarde 30-40s", "success");
+    try {
+      const r = await fetch("/api/seed", { method: "POST" });
+      const d = await r.json();
+      showToast(`Re-seed concluído: ${d.docsAdded} transações geradas`);
+      loadStats();
+    } catch { showToast("Falha no re-seed (timeout? cheque os logs)", "danger"); }
+  };
+
+  // Init
+  loadStats();
+  loadSettings();
+})();
+</script>
+
+</body>
+</html>

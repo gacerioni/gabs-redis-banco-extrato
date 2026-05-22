@@ -1,0 +1,50 @@
+# Itaú Extrato · default compose — roda em laptop (Windows/Mac/Linux) ou VM.
+#
+# Sobe 2 serviços:
+#   redis  — Redis 8.x oficial (Search/JSON/Streams/Bloom/VectorSet nativos)
+#   itau   — API .NET 8 da busca de extrato na 5218
+#
+# A imagem é publicada como gacerioni/redis-banco-extrato:<tag>; o
+# `build:` permite também `docker compose build` local pra iterar.
+#
+# Setup:
+#   cp .env.example .env   # preencher OPENAI_API_KEY
+#   docker compose up -d
+#
+# UI:    http://localhost:5218
+# Admin: http://localhost:5218/admin.html
+
+services:
+  redis:
+    image: redis:8
+    container_name: itau-extrato-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6380}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  itau:
+    image: gacerioni/redis-banco-extrato:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: itau-extrato-api
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "5218:5218"
+    environment:
+      ASPNETCORE_URLS: http://+:5218
+      REDIS_URL: redis://redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set in your shell or .env file}
+
+volumes:
+  redis-data:

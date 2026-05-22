@@ -1,0 +1,46 @@
+{
+  "_description": "Termos pra alimentar o FT.SUGADD inicial. Score base 1.0 — termos vão subindo conforme o gerador encontra eles nas transações reais (FT.SUGADD com increment:true). Dividido em grupos só pra organização humana; o dicionário final é flat.",
+  "_key": "dict:autocomplete",
+  "merchants": {
+    "alimentacao": ["iFood", "Rappi", "Uber Eats", "Outback", "Madero", "Subway", "McDonald's", "Burger King", "Starbucks", "Coco Bambu", "Habib's"],
+    "transporte": ["Uber", "99", "Cabify", "Posto Shell", "Posto Ipiranga", "Posto Petrobras", "Posto BR Mania", "Rodízio Anhanguera", "AutoBan"],
+    "supermercado": ["Carrefour", "Pão de Açúcar", "Atacadão", "Assaí", "Extra Hipermercados", "Sams Club", "Walmart", "Hortifruti", "St Marche"],
+    "streaming": ["Netflix", "Spotify", "Amazon Prime", "Disney+", "HBO Max", "Globoplay", "Deezer", "Apple Music", "YouTube Premium"],
+    "servicos_utilidades": ["AES Eletropaulo", "Enel", "CEMIG", "CPFL", "Sabesp", "Copasa", "Vivo Fibra", "Oi Fibra", "Claro Net", "TIM Celular", "Vivo Celular", "Claro Celular", "Sky"],
+    "compras": ["Magazine Luiza", "Amazon", "Mercado Livre", "Shopee", "Casas Bahia", "Americanas", "Submarino", "Magalu", "AliExpress", "Renner", "Riachuelo", "C&A", "Zara", "Adidas", "Nike"],
+    "saude": ["Drogasil", "Raia", "Pague Menos", "Drogaria São Paulo", "Onofre", "Hospital Sírio-Libanês", "Hospital Albert Einstein", "Fleury", "Dasa"],
+    "investimentos": ["Tesouro Direto", "CDB Itaú", "Fundo DI", "Fundo Multimercado", "BB Ações", "iShares ETF"],
+    "imobiliario": ["Imobiliária Lopes", "QuintoAndar", "Loft", "EmCasa"]
+  },
+  "recipients_pix_padrao": [
+    "Dua Lipa",
+    "Juliana Cerioni",
+    "Don Ramon",
+    "Felipe Lume",
+    "Miller Moreno",
+    "Camila Andrade",
+    "Pedro Castro"
+  ],
+  "categorias_e_tipos": [
+    "Pix", "TED", "DOC", "Boleto", "Cartão de crédito", "Cartão de débito",
+    "Salário", "Investimento", "Estorno", "Saque", "Depósito",
+    "Alimentação", "Transporte", "Moradia", "Saúde", "Lazer",
+    "Serviços", "Compras", "Educação", "Impostos"
+  ],
+  "frases_busca_comuns": [
+    "meu salário",
+    "minha conta de luz",
+    "meu aluguel",
+    "meu cartão de crédito",
+    "pix recebido",
+    "pix enviado",
+    "compras no mês",
+    "estornos",
+    "boletos vencidos",
+    "investimentos do mês",
+    "gastos com alimentação",
+    "gastos com transporte",
+    "compras parceladas",
+    "fatura do cartão"
+  ]
+}

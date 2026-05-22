@@ -1,0 +1,24 @@
+# Cloud overlay — soma com docker-compose.yml pra rodar em VM com nginx
+# externo já configurado (certbot via Let's Encrypt na 80/443).
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d
+#
+# Mudanças sobre o base:
+#   • API deixa de expor pro mundo (0.0.0.0:5218) — bind só em 127.0.0.1:5218
+#     pro nginx do host fazer reverse proxy.
+#   • Redis bind 127.0.0.1 já vem do base.
+#
+# nginx: ver deploy/nginx-extrato.conf. O deploy.sh copia pro
+# /etc/nginx/sites-available, symlink em sites-enabled, e roda
+# `certbot --nginx` pra emitir o cert LE.
+#
+# Pré-requisito DNS: A record do seu domínio → IP da VM.
+
+services:
+  itau:
+    # API escuta só em loopback, nginx faz reverse proxy.
+    # `!override` substitui a lista herdada do base (5218:5218 público) pela
+    # versão bind-localhost — `!reset` sozinho só limpa, não seta.
+    ports: !override
+      - "127.0.0.1:5218:5218"

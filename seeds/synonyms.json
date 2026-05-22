@@ -1,0 +1,29 @@
+{
+  "_description": "Grupos de sinônimos PT-BR pro RediSearch via FT.SYNUPDATE. Cada grupo expande mutuamente: se o usuário busca 'luz', match também em docs que tenham 'eletropaulo', 'energia', 'cpfl' etc. Suporta typos comuns ('piques' como Pix), gírias ('rolê' como lazer), e variações regionais (operadora de luz por estado).",
+  "_index": "idx:transactions",
+  "groups": {
+    "pix": ["pix", "piques", "pic", "transferencia instantanea"],
+    "ted_doc": ["ted", "doc", "transferencia"],
+    "cartao": ["cartao", "cartão", "cartao credito", "credito", "cartao debito", "debito"],
+    "boleto": ["boleto", "boletinho", "fatura"],
+    "salario": ["salario", "salário", "holerite", "contracheque", "pagamento", "ordenado"],
+    "estorno": ["estorno", "devolucao", "devolução", "reembolso", "chargeback"],
+    "luz": ["luz", "energia", "conta de luz", "eletricidade", "eletropaulo", "aes eletropaulo", "enel", "cemig", "cpfl", "light"],
+    "agua": ["agua", "água", "conta de agua", "sabesp", "saneamento", "copasa", "sanepar"],
+    "internet": ["internet", "wifi", "banda larga", "fibra", "vivo fibra", "oi fibra", "claro net", "net", "sky"],
+    "celular": ["celular", "telefone", "operadora", "tim", "vivo", "claro", "oi", "nextel", "linha"],
+    "alimentacao": ["alimentacao", "alimentação", "comida", "refeicao", "refeição", "almoco", "almoço", "jantar", "rango"],
+    "delivery": ["delivery", "ifood", "rappi", "ubereats", "uber eats", "loggi"],
+    "supermercado": ["supermercado", "mercado", "feira", "atacado", "atacadao", "atacadão", "carrefour", "pao de acucar", "pão de açúcar", "extra", "assai", "assaí"],
+    "transporte": ["transporte", "corrida", "motorista", "uber", "99", "cabify", "taxi", "táxi"],
+    "combustivel": ["combustivel", "combustível", "gasolina", "etanol", "alcool", "diesel", "abastecimento", "posto", "shell", "ipiranga", "petrobras", "br mania"],
+    "lazer": ["lazer", "diversao", "diversão", "rolê", "role", "passeio", "cinema", "show"],
+    "streaming": ["streaming", "netflix", "spotify", "amazon prime", "disney plus", "globoplay", "hbo max", "deezer", "apple music"],
+    "compras": ["compras", "shopping", "loja", "online", "magalu", "magazine luiza", "amazon", "mercado livre", "shopee", "americanas", "casas bahia"],
+    "saude": ["saude", "saúde", "farmacia", "farmácia", "remedio", "remédio", "drogasil", "raia", "pague menos", "medico", "médico", "consulta", "exame", "hospital"],
+    "investimentos": ["investimento", "investimentos", "cdb", "tesouro", "tesouro direto", "fundo", "fundos", "renda fixa", "renda variavel", "renda variável", "acoes", "ações", "fii", "fiis", "previdencia"],
+    "moradia": ["moradia", "aluguel", "casa", "apartamento", "condominio", "condomínio", "iptu"],
+    "saque": ["saque", "retirada", "atm", "caixa eletronico", "caixa eletrônico", "24horas"],
+    "tarifa": ["tarifa", "taxa", "tarifa bancaria", "tarifa de manutencao", "iof", "anuidade"]
+  }
+}

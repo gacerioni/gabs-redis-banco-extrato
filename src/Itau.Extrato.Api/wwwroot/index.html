@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Itaú · Busca de Extrato</title>
+<style>
+  :root {
+    --itau-orange: #EC7000;
+    --itau-orange-dark: #C25A00;
+    --itau-orange-light: #FFB873;
+    --itau-orange-bg: #FFF4E5;
+    --itau-blue: #003C8F;
+    --bg: #F4F4F4;
+    --card: #FFFFFF;
+    --border: #E5E5E5;
+    --text: #2B2B2B;
+    --muted: #6B6B6B;
+    --muted-2: #9A9A9A;
+    --green: #008C3F;
+    --red: #C8102E;
+    --green-bg: #E8F5EC;
+    --red-bg: #FBEBEE;
+    --shadow: 0 2px 8px rgba(0,0,0,0.06);
+    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, "Segoe UI", "Helvetica Neue", Roboto, system-ui, sans-serif; }
+
+  /* ============================== Header ============================ */
+  header.itau-header {
+    background: var(--itau-orange);
+    color: white;
+    padding: 12px 28px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  /* Logo do Itaú é laranja — em fundo laranja vira invisível. Wrap num
+     pill branco com leve sombra pra dar contraste (padrão dos próprios
+     materiais oficiais do banco em fundos coloridos). */
+  header.itau-header .logo-pill {
+    background: white;
+    border-radius: 8px;
+    padding: 4px 10px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  header.itau-header .logo-pill img { height: 32px; width: auto; display: block; }
+  header.itau-header h1 { margin: 0; font-size: 18px; font-weight: 500; }
+  /* Pill mostrando qual Redis tá conectado — local vs Redis Cloud. */
+  header.itau-header .redis-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 14px;
+    padding: 4px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  header.itau-header .redis-pill .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #3FE889;
+    box-shadow: 0 0 6px #3FE889;
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+  header.itau-header .redis-pill.cloud .dot { background: #FFC857; box-shadow: 0 0 6px #FFC857; }
+  header.itau-header .redis-pill.offline .dot { background: #C8102E; box-shadow: 0 0 6px #C8102E; animation: none; }
+  @keyframes pulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+  header.itau-header .header-link {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: none;
+    border-radius: 18px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+    transition: background 0.1s;
+  }
+  header.itau-header .header-link:hover { background: rgba(255,255,255,0.28); }
+  header.itau-header .spacer { flex: 1; }
+  header.itau-header .user-pill {
+    background: rgba(255,255,255,0.18);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  header.itau-header .user-pill select {
+    background: transparent;
+    color: white;
+    border: none;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  header.itau-header .user-pill select option { color: var(--text); }
+  header.itau-header .pov-badge {
+    background: rgba(0,0,0,0.18);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* ============================== Demo banner ======================= */
+  .demo-banner {
+    background: linear-gradient(180deg, #FFF9F0 0%, var(--bg) 100%);
+    border-bottom: 1px solid var(--itau-orange-light);
+  }
+  .demo-banner-toggle {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 10px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .demo-banner-toggle:hover { background: rgba(236,112,0,0.05); }
+  .demo-banner-toggle .left { display: flex; align-items: center; gap: 10px; }
+  .demo-banner-toggle .badge-demo {
+    background: var(--itau-orange);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+  }
+  .demo-banner-toggle .right {
+    color: var(--itau-orange-dark);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--mono);
+  }
+  .demo-banner-body { padding: 0 28px 18px; display: none; }
+  .demo-banner.open .demo-banner-body { display: block; }
+  .demo-banner .dgrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .demo-banner .dcard {
+    background: white;
+    border-radius: 8px;
+    padding: 12px 14px;
+    border-left: 3px solid var(--muted);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .demo-banner .dcard.redis  { border-left-color: var(--green); }
+  .demo-banner .dcard.llm    { border-left-color: var(--itau-orange); }
+  .demo-banner .dcard.cached { border-left-color: var(--green); }
+  .demo-banner .dcard.suggest{ border-left-color: #1A73E8; }
+  .demo-banner .dcard h4 { margin: 0 0 6px 0; font-size: 13px; font-weight: 600; }
+  .demo-banner .dcard p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .demo-banner .dcard code {
+    background: var(--itau-orange-bg);
+    color: var(--itau-orange-dark);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .demo-banner .dnote { margin: 12px 0 0; font-size: 12px; color: var(--muted-2); text-align: center; }
+  .demo-banner .dnote a { color: var(--itau-orange-dark); }
+
+  /* ============================== Layout ============================ */
+  main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+  }
+  .content { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ============================== Account card ====================== */
+  .account-card {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 16px 22px;
+    box-shadow: var(--shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid var(--itau-orange);
+  }
+  .account-card .who-greet { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .account-card .who { font-size: 18px; font-weight: 600; line-height: 1.2; margin-top: 1px; }
+  .account-card .who-sub { font-size: 12px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+  .account-card .balance-label { font-size: 11px; color: var(--muted); }
+  .account-card .balance { font-size: 26px; font-weight: 700; margin-top: 2px; color: var(--text); font-feature-settings: "tnum"; }
+  .account-card .balance-when { font-size: 10px; color: var(--muted-2); font-family: var(--mono); margin-top: 2px; }
+
+  /* ============================== Search card ======================= */
+  .search-card {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+  }
+  .search-card h2 {
+    margin: 0 0 6px 0;
+    font-size: 18px;
+    color: var(--itau-blue);
+    font-weight: 600;
+  }
+  .search-card .hint {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 14px 0;
+    line-height: 1.5;
+  }
+  .search-card .hint code {
+    background: var(--itau-orange-bg);
+    color: var(--itau-orange-dark);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .search-bar {
+    position: relative;
+  }
+  .search-bar input {
+    width: 100%;
+    font-size: 18px;
+    padding: 14px 18px 14px 48px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: var(--card) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B6B6B' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.3-4.3'/></svg>") no-repeat 16px center / 20px 20px;
+    font-family: inherit;
+    color: var(--text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .search-bar input:focus {
+    outline: none;
+    border-color: var(--itau-orange);
+    box-shadow: 0 0 0 3px var(--itau-orange-bg);
+  }
+
+  .suggest-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+  }
+  .suggest-dropdown.open { display: block; }
+  .suggest-item {
+    padding: 10px 18px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text);
+    border-bottom: 1px solid #F5F5F5;
+  }
+  .suggest-item:last-child { border-bottom: none; }
+  .suggest-item:hover, .suggest-item.active { background: var(--itau-orange-bg); color: var(--itau-orange-dark); }
+  .suggest-meta {
+    padding: 6px 18px;
+    font-size: 10px;
+    color: var(--muted-2);
+    font-family: var(--mono);
+    border-top: 1px solid var(--border);
+    background: #FAFAFA;
+  }
+
+  /* Golden path chips */
+  .golden-paths {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .golden-chip {
+    background: var(--itau-orange-bg);
+    color: var(--itau-orange-dark);
+    border: 1px solid var(--itau-orange-light);
+    border-radius: 18px;
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.1s;
+    font-family: inherit;
+  }
+  .golden-chip:hover { background: var(--itau-orange); color: white; border-color: var(--itau-orange); }
+
+  /* ============================== Results =========================== */
+  .results-card {
+    background: var(--card);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .results-header {
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #FAFAFA;
+  }
+  .results-header h3 {
+    margin: 0;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .results-header .count {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .results-list {
+    max-height: 560px;
+    overflow-y: auto;
+  }
+  .tx-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 140px;
+    align-items: center;
+    padding: 14px 22px;
+    border-bottom: 1px solid #F5F5F5;
+    gap: 16px;
+    transition: background 0.1s;
+  }
+  .tx-row:hover { background: #FAFAFA; }
+  .tx-row:last-child { border-bottom: none; }
+  .tx-date {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    line-height: 1.4;
+  }
+  .tx-date .day { font-size: 16px; font-weight: 600; color: var(--text); display: block; }
+  .tx-date .hhmm {
+    display: block;
+    font-size: 10px;
+    color: var(--muted-2);
+    margin-top: 2px;
+  }
+  .tx-content { display: flex; align-items: center; gap: 12px; }
+  .tx-icon {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: var(--itau-orange-bg);
+    color: var(--itau-orange);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .tx-icon.credit { background: var(--green-bg); color: var(--green); }
+  .tx-icon.debit { background: var(--red-bg); color: var(--red); }
+  .tx-desc {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .tx-desc .primary { font-weight: 500; color: var(--text); }
+  .tx-desc .secondary {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 2px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  /* Mensagem livre do Pix — campo de memo que o cliente digita no app.
+     Renderizada em itálico com aspas tipográficas, abaixo da description. */
+  .tx-desc .pix-memo {
+    color: var(--text);
+    font-size: 12.5px;
+    font-style: italic;
+    margin-top: 4px;
+    padding: 4px 10px;
+    background: var(--itau-orange-bg);
+    border-left: 2px solid var(--itau-orange);
+    border-radius: 3px;
+    display: inline-block;
+    max-width: 100%;
+  }
+  .tx-desc .pix-memo::before { content: "💬 \""; opacity: 0.6; margin-right: 1px; }
+  .tx-desc .pix-memo::after  { content: "\""; opacity: 0.6; margin-left: 1px; }
+  .tx-desc .secondary .pill {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 1px 7px;
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+  .tx-desc .secondary .pill.parc { background: var(--itau-orange-bg); color: var(--itau-orange-dark); }
+  .tx-amount {
+    font-size: 15px;
+    font-weight: 600;
+    text-align: right;
+    font-family: var(--mono);
+  }
+  .tx-amount.credit { color: var(--green); }
+  .tx-amount.debit { color: var(--red); }
+  .tx-amount-sub {
+    font-size: 11px;
+    color: var(--muted-2);
+    font-family: var(--mono);
+    margin-top: 2px;
+    text-align: right;
+  }
+
+  .empty-state {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .empty-state h4 { margin: 0 0 8px 0; color: var(--text); }
+
+  /* ============================== Telemetry ========================= */
+  aside.telemetry {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+  }
+  aside.telemetry h3 {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .mode-banner {
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    border-left: 4px solid var(--muted);
+    background: var(--bg);
+  }
+  .mode-banner.redis { background: var(--green-bg); border-left-color: var(--green); }
+  .mode-banner.redis .value { color: var(--green); }
+  .mode-banner.cached { background: var(--green-bg); border-left-color: var(--green); }
+  .mode-banner.cached .value { color: var(--green); }
+  .mode-banner.llm { background: var(--itau-orange-bg); border-left-color: var(--itau-orange); }
+  .mode-banner.llm .value { color: var(--itau-orange-dark); }
+  .mode-banner.semantic { background: #E8F0FE; border-left-color: #1A73E8; }
+  .mode-banner.semantic .value { color: #1A73E8; }
+  .mode-banner .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .mode-banner .value { font-family: var(--mono); font-size: 14px; font-weight: 700; margin-top: 3px; }
+  .mode-banner .savings {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 500;
+    font-family: var(--mono);
+  }
+  .stat-card .value .unit { font-size: 11px; color: var(--muted); margin-left: 2px; font-weight: 400; }
+  .stage-row.cached { color: var(--green); font-weight: 500; }
+  .interp {
+    background: var(--itau-orange-bg);
+    color: var(--itau-orange-dark);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .stat-card {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .stat-card.redis { background: var(--green-bg); }
+  .stat-card .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  .stat-card .value { font-family: var(--mono); font-size: 18px; font-weight: 600; margin-top: 2px; }
+  .stat-card.redis .value { color: var(--green); }
+  .stat-card .sub { font-size: 10px; color: var(--muted-2); font-family: var(--mono); }
+
+  .stage-list { font-family: var(--mono); font-size: 11px; margin-bottom: 14px; }
+  .stage-row { display: flex; justify-content: space-between; padding: 3px 0; color: var(--muted); }
+  .stage-row.redis { color: var(--green); }
+  .stage-row.llm { color: var(--itau-orange-dark); }
+  .stage-row .ms { font-weight: 600; }
+
+  .llm-rewrite-block {
+    background: #1c232c;
+    color: #C8E6FA;
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    margin-top: 8px;
+  }
+  .llm-rewrite-block .key { color: #FFB873; }
+  .llm-rewrite-block .str { color: #B5E5C5; }
+  .llm-rewrite-block .num { color: #FFD580; }
+  .llm-rewrite-block .null { color: #999; }
+  .llm-rewrite-block .interp {
+    background: var(--itau-orange-bg);
+    color: var(--itau-orange-dark);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-top: 6px;
+  }
+
+  .ft-query-block {
+    background: #FAFAFA;
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 6px;
+    word-break: break-all;
+  }
+
+  .empty-telemetry { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; font-style: italic; }
+</style>
+</head>
+<body>
+
+<header class="itau-header">
+  <div class="logo-pill"><img src="/assets/itau-logo.svg" alt="Itaú"></div>
+  <h1>Busca no Extrato</h1>
+  <span class="pov-badge">PoV</span>
+  <span class="redis-pill" id="redis-pill" title="Backend Redis em uso">
+    <span class="dot"></span>
+    <span class="text" id="redis-pill-text">conectando…</span>
+  </span>
+  <div class="spacer"></div>
+  <button class="header-link" id="open-admin" title="Painel de admin">⚙ admin</button>
+  <div class="user-pill">
+    <span>👤</span>
+    <select id="user-select">
+      <option value="gabriel_cerioni">Gabriel Cerioni (12 meses)</option>
+      <option value="miller_moreno">Miller Moreno (6 meses)</option>
+      <option value="camila_andrade">Camila Andrade (3 meses)</option>
+      <option value="pedro_castro">Pedro Castro (3 meses)</option>
+    </select>
+  </div>
+</header>
+
+<div class="demo-banner" id="demo-banner">
+  <button class="demo-banner-toggle" id="demo-banner-toggle">
+    <span class="left">
+      <span class="badge-demo">DEMO</span>
+      <span class="title">Esta é uma <b>Proof of Value</b> do Redis substituindo o Elasticsearch na busca de extrato.</span>
+    </span>
+    <span class="right" id="demo-banner-arrow">▼ ver detalhes</span>
+  </button>
+  <div class="demo-banner-body" id="demo-banner-body">
+    <div class="dgrid">
+      <div class="dcard redis">
+        <h4>🚀 Caminho 1 — Redis-only</h4>
+        <p>95% das queries (<code>uber</code>, <code>luz</code>, <code>ifood</code>) caem aqui. <code>FT.SEARCH</code> com <code>FT.SYNUPDATE</code> nativo + TAG/NUMERIC filters em um único roundtrip. <b>Zero LLM, zero embedding. 1-10 ms wall-clock.</b></p>
+      </div>
+      <div class="dcard llm">
+        <h4>🧠 Caminho 2 — LLM rewrite (1ª vez)</h4>
+        <p>Long-tail conversacional (<code>piques pra Dua esse mês</code>) — extrai filtros estruturados (datas, ranges, direção, counterparty) via Structured Outputs. ~1.5–2s na 1ª vez.</p>
+      </div>
+      <div class="dcard cached">
+        <h4>✨ Caminho 3 — Cached rewrite</h4>
+        <p>O resultado do rewrite vai pro Redis (<code>JSON.SET rewrite:{hash}</code>, TTL configurável). Mesma query depois resolve <b>sem chamar OpenAI</b> — 5–10 ms. <b>1600× speedup.</b></p>
+      </div>
+      <div class="dcard suggest">
+        <h4>⚡ Autocomplete sub-ms</h4>
+        <p><code>FT.SUGGET FUZZY</code>: pega <code>"duar"</code> e sugere <code>Dua Lipa</code> mesmo com typo, em ~1 ms. Estrutura trie-otimizada nativa do Redis Stack — não é índice extra.</p>
+      </div>
+    </div>
+    <p class="dnote">Visualize cada caminho na coluna direita ao buscar. O painel <a href="/admin.html">⚙ admin</a> mostra contagens dos índices, configura TTL e gerencia o cache em tempo real.</p>
+  </div>
+</div>
+
+<main>
+  <div class="content">
+
+    <div class="account-card">
+      <div>
+        <div class="who-greet" id="acc-greet">Olá,</div>
+        <div class="who" id="acc-name">Gabriel Cerioni</div>
+        <div class="who-sub" id="acc-detail">ag. 0001 · cc 12345-6 · CPF ***.234.567-**</div>
+      </div>
+      <div style="text-align: right;">
+        <div class="balance-label">saldo em conta corrente</div>
+        <div class="balance" id="acc-balance">—</div>
+        <div class="balance-when" id="acc-balance-when"></div>
+      </div>
+    </div>
+
+    <div class="search-card">
+      <h2>busque qualquer coisa no seu extrato</h2>
+      <p class="hint">
+        Escreva como se estivesse falando: <code>quanto gastei com ifood mês passado?</code>,
+        <code>piques pra Dua esse mês</code>. Ou só uma palavra-chave: <code>uber</code>,
+        <code>luz</code>, <code>parcelado</code>.
+      </p>
+      <div class="search-bar">
+        <input id="q" type="text" placeholder='Buscar no extrato — "fatura do cartão", "salário", "uber"…' autocomplete="off">
+        <div class="suggest-dropdown" id="suggest"></div>
+      </div>
+      <div class="golden-paths">
+        <button class="golden-chip" data-q="piques pra Dua esse mês">piques pra Dua esse mês</button>
+        <button class="golden-chip" data-q="uber">uber</button>
+        <button class="golden-chip" data-q="luz">luz</button>
+        <button class="golden-chip" data-q="quanto gastei com ifood no mês passado?">quanto gastei com ifood no mês passado?</button>
+        <button class="golden-chip" data-q="compras parceladas">compras parceladas</button>
+        <button class="golden-chip" data-q="meu salário">meu salário</button>
+        <button class="golden-chip" data-q="pix recebido">pix recebido</button>
+        <button class="golden-chip" data-q="estornos">estornos</button>
+      </div>
+    </div>
+
+    <div class="results-card">
+      <div class="results-header">
+        <h3>Lançamentos</h3>
+        <span class="count" id="result-count">aguardando busca…</span>
+      </div>
+      <div class="results-list" id="results">
+        <div class="empty-state">
+          <h4>Comece com uma busca</h4>
+          <p>Clique num atalho acima ou digite no campo de busca.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <aside class="telemetry">
+    <h3>📊 Telemetry · última busca</h3>
+    <div id="telemetry-content">
+      <div class="empty-telemetry">Faça uma busca pra ver as métricas decompostas.</div>
+    </div>
+  </aside>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const input = $("q");
+  const suggest = $("suggest");
+  const results = $("results");
+  const resultCount = $("result-count");
+  const telemetry = $("telemetry-content");
+  const userSelect = $("user-select");
+
+  let suggestController = null;
+  let searchController = null;
+  let suggestTimer = null;
+  let activeSuggestIndex = -1;
+
+  // ------- helpers -------
+  function currentUser() { return userSelect.value || "gabriel_cerioni"; }
+
+  function fmtBrl(v) {
+    if (v === null || v === undefined) return "—";
+    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
+  }
+  function fmtBrlBare(v) {
+    if (v === null || v === undefined) return "—";
+    return "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtDateTime(unix) {
+    const d = new Date(unix * 1000);
+    return {
+      day: d.toLocaleDateString("pt-BR", { day: "2-digit" }),
+      monthYear: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "") + " " +
+                 d.getFullYear().toString().slice(-2),
+      time: d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    };
+  }
+  function fmtRelativeWhen(unix) {
+    const now = Date.now() / 1000;
+    const diff = now - unix;
+    if (diff < 60) return "agora";
+    if (diff < 3600) return `há ${Math.floor(diff/60)}min`;
+    if (diff < 86400) return `há ${Math.floor(diff/3600)}h`;
+    if (diff < 86400 * 7) return `há ${Math.floor(diff/86400)} dias`;
+    const d = new Date(unix * 1000);
+    return "em " + d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  }
+  function txIcon(t) {
+    const map = {
+      pix: "🔁",
+      ted: "↗",
+      doc: "↗",
+      boleto: "🧾",
+      cartao_credito: "💳",
+      cartao_debito: "💳",
+      saque: "🏧",
+      deposito: "🏧",
+      estorno: "↩",
+      salario: "💰",
+      investimento: "📈",
+      tarifa: "⚙",
+      iof: "⚙",
+      debito_automatico: "🔄",
+    };
+    return map[t] || "•";
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[<>&"]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
+  }
+
+  // ------- account fetch (pega perfil + saldo real do backend) -------
+  async function loadAccount() {
+    try {
+      const r = await fetch(`/api/account?user_id=${encodeURIComponent(currentUser())}`);
+      const d = await r.json();
+      $("acc-name").textContent = d.display_name;
+      $("acc-detail").textContent = `ag. ${d.agencia} · cc ${d.conta} · CPF ${d.cpf_masked}`;
+      if (d.balance_brl !== null && d.balance_brl !== undefined) {
+        $("acc-balance").textContent = fmtBrlBare(d.balance_brl);
+        $("acc-balance-when").textContent = d.balance_at_unix
+          ? `atualizado ${fmtRelativeWhen(d.balance_at_unix)}`
+          : "";
+      } else {
+        $("acc-balance").textContent = "—";
+        $("acc-balance-when").textContent = "carregando…";
+      }
+    } catch {
+      $("acc-balance").textContent = "—";
+    }
+  }
+
+  userSelect.addEventListener("change", () => {
+    loadAccount();
+    results.innerHTML = `<div class="empty-state"><h4>conta trocada</h4><p>busque algo no extrato pra começar.</p></div>`;
+    resultCount.textContent = "—";
+    telemetry.innerHTML = `<div class="empty-telemetry">faça uma busca pra ver as métricas decompostas.</div>`;
+    input.value = "";
+  });
+
+  // ------- typeahead -------
+  input.addEventListener("input", () => {
+    clearTimeout(suggestTimer);
+    const q = input.value.trim();
+    if (q.length < 2) { suggest.classList.remove("open"); return; }
+    suggestTimer = setTimeout(() => fetchSuggest(q), 100);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    const items = suggest.querySelectorAll(".suggest-item");
+    if (e.key === "ArrowDown" && items.length > 0) {
+      e.preventDefault();
+      activeSuggestIndex = (activeSuggestIndex + 1) % items.length;
+      updateActiveSuggest(items);
+    } else if (e.key === "ArrowUp" && items.length > 0) {
+      e.preventDefault();
+      activeSuggestIndex = (activeSuggestIndex - 1 + items.length) % items.length;
+      updateActiveSuggest(items);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeSuggestIndex >= 0 && items[activeSuggestIndex]) {
+        input.value = items[activeSuggestIndex].textContent;
+      }
+      suggest.classList.remove("open");
+      activeSuggestIndex = -1;
+      doSearch(input.value);
+    } else if (e.key === "Escape") {
+      suggest.classList.remove("open");
+      activeSuggestIndex = -1;
+    }
+  });
+
+  function updateActiveSuggest(items) {
+    items.forEach((it, i) => it.classList.toggle("active", i === activeSuggestIndex));
+  }
+
+  async function fetchSuggest(q) {
+    if (suggestController) suggestController.abort();
+    suggestController = new AbortController();
+    try {
+      const r = await fetch(`/api/extrato/suggest?q=${encodeURIComponent(q)}&max=8`, { signal: suggestController.signal });
+      const data = await r.json();
+      renderSuggest(data);
+    } catch (e) { if (e.name !== "AbortError") console.error(e); }
+  }
+
+  function renderSuggest(data) {
+    const items = data.items || [];
+    if (items.length === 0) { suggest.classList.remove("open"); return; }
+    const html = items.map(it => `<div class="suggest-item">${escapeHtml(it)}</div>`).join("") +
+                 `<div class="suggest-meta">FT.SUGGET FUZZY · ${data.latency_ms?.toFixed?.(2) || "?"}ms</div>`;
+    suggest.innerHTML = html;
+    suggest.classList.add("open");
+    activeSuggestIndex = -1;
+    suggest.querySelectorAll(".suggest-item").forEach(el => {
+      el.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        input.value = el.textContent;
+        suggest.classList.remove("open");
+        doSearch(el.textContent);
+      });
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-bar")) suggest.classList.remove("open");
+  });
+
+  // ------- golden chips -------
+  document.querySelectorAll(".golden-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      input.value = chip.dataset.q;
+      suggest.classList.remove("open");
+      doSearch(chip.dataset.q);
+    });
+  });
+
+  // ------- main search -------
+  async function doSearch(query) {
+    if (!query || !query.trim()) return;
+    if (searchController) searchController.abort();
+    searchController = new AbortController();
+    resultCount.textContent = "buscando…";
+    try {
+      const r = await fetch("/api/extrato/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, user_id: currentUser(), limit: 50 }),
+        signal: searchController.signal,
+      });
+      const data = await r.json();
+      renderResults(data);
+      renderTelemetry(data);
+    } catch (e) {
+      if (e.name !== "AbortError") {
+        console.error(e);
+        resultCount.textContent = "erro";
+      }
+    }
+  }
+
+  function renderResults(data) {
+    const items = data.items || [];
+    if (items.length === 0) {
+      results.innerHTML = `
+        <div class="empty-state">
+          <h4>nada encontrado</h4>
+          <p>tente reformular ou usar um dos atalhos acima.</p>
+        </div>`;
+      resultCount.textContent = "0 lançamentos";
+      return;
+    }
+    resultCount.textContent = `${data.total_results} lançament${data.total_results === 1 ? "o" : "os"}`;
+    results.innerHTML = items.map(it => {
+      const isCredit = it.amountBrl > 0 || it.direction === "inbound";
+      const dt = fmtDateTime(it.dateUnix);
+      const installmentPill = it.installment ? `<span class="pill parc">parc ${it.installment}</span>` : "";
+      return `
+        <div class="tx-row">
+          <div class="tx-date">
+            <span class="day">${dt.day}</span>
+            <span>${dt.monthYear}</span>
+            <span class="hhmm">${dt.time}</span>
+          </div>
+          <div class="tx-content">
+            <div class="tx-icon ${isCredit ? "credit" : "debit"}">${txIcon(it.type)}</div>
+            <div class="tx-desc">
+              <div class="primary">${escapeHtml(it.description)}</div>
+              ${it.pixMessage ? `<div class="pix-memo">${escapeHtml(it.pixMessage)}</div>` : ""}
+              <div class="secondary">
+                <span class="pill">${it.type.replace("_", " ")}</span>
+                ${it.counterpartyName ? `<span>${escapeHtml(it.counterpartyName)}</span>` : ""}
+                ${installmentPill}
+                <span style="color: var(--muted-2);">${it.category}</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="tx-amount ${isCredit ? "credit" : "debit"}">${fmtBrl(it.amountBrl)}</div>
+            ${it.balanceAfter !== null && it.balanceAfter !== undefined ? `<div class="tx-amount-sub">saldo ${fmtBrl(it.balanceAfter)}</div>` : ""}
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  function renderTelemetry(data) {
+    const m = data.metrics || {};
+    const stages = m.stages || {};
+    const filter = data.filter;
+    const llmJson = m.llm_rewrite_json;
+    const fromCache = data.from_rewrite_cache === true;
+    const modeLabel = data.mode_label || data.mode || "?";
+
+    // Banner: cor varia por modo. Redis-only e cached = verde (sem custo de
+    // OpenAI). LLM rewrite primeiro = laranja (1.8s OpenAI). Semantic = azul.
+    let bannerClass = "redis";
+    if (data.mode === "nl_llm_rewrite") bannerClass = "llm";
+    else if (data.mode === "semantic_vss") bannerClass = "semantic";
+    else if (data.mode === "nl_cached_rewrite") bannerClass = "cached";
+
+    const stageRows = Object.entries(stages).map(([name, ms]) => {
+      let cls = "other";
+      if (/ft\.search|cache_get|cache_set|sugget/.test(name)) cls = "redis";
+      else if (/embed|llm|rewrite/.test(name) && !/cache/.test(name)) cls = "llm";
+      else if (/skipped/.test(name)) cls = "cached";
+      const sym = cls === "redis" ? "⚡" : cls === "llm" ? "🧠" : cls === "cached" ? "✨" : "·";
+      return `<div class="stage-row ${cls}"><span>${sym} ${name}</span><span class="ms">${ms.toFixed(2)}ms</span></div>`;
+    }).join("");
+
+    let savingsHtml = "";
+    if (fromCache) {
+      savingsHtml = `<div class="savings">💰 economizou ~1.7s e ~$0.00008 (cache hit do rewrite)</div>`;
+    }
+
+    let llmBlock = "";
+    if (llmJson) {
+      try {
+        const parsed = JSON.parse(llmJson);
+        const interp = parsed.interpretation;
+        const { interpretation, ...rest } = parsed;
+        const pretty = JSON.stringify(rest, null, 2);
+        const colored = pretty
+          .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
+          .replace(/: "([^"]*)"/g, (mm, s) => `: <span class="str">"${escapeHtml(s)}"</span>`)
+          .replace(/: (true|false|null)/g, (mm, v) => `: <span class="null">${v}</span>`)
+          .replace(/: (-?\d+\.?\d*)/g, (mm, n) => `: <span class="num">${n}</span>`);
+        const blockTitle = fromCache
+          ? "✨ rewrite vindo do cache (não chamou OpenAI)"
+          : "🧠 rewrite gerado pelo LLM";
+        llmBlock = `
+          <h3 style="margin-top: 16px;">${blockTitle}</h3>
+          ${interp ? `<div class="interp">${escapeHtml(interp)}</div>` : ""}
+          <div class="llm-rewrite-block">${colored}</div>`;
+      } catch {}
+    }
+
+    let ftQueryBlock = "";
+    if (filter && filter.ftQuery) {
+      ftQueryBlock = `
+        <h3 style="margin-top: 16px;">🔎 FT.SEARCH gerado</h3>
+        <div class="ft-query-block">${escapeHtml(filter.ftQuery)}</div>`;
+    }
+
+    telemetry.innerHTML = `
+      <div class="mode-banner ${bannerClass}">
+        <div class="label">modo da busca</div>
+        <div class="value">${modeLabel}</div>
+        ${savingsHtml}
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="label">total wall</div>
+          <div class="value">${m.total_ms?.toFixed(0) || "?"}<span class="unit">ms</span></div>
+        </div>
+        <div class="stat-card redis">
+          <div class="label">redis</div>
+          <div class="value">${m.redis_total_ms?.toFixed(1) || "?"}<span class="unit">ms</span></div>
+          <div class="sub">${m.redis_ops || 0} op${m.redis_ops === 1 ? "" : "s"}</div>
+        </div>
+      </div>
+      <h3>⏱ stages</h3>
+      <div class="stage-list">${stageRows || `<div class="stage-row">—</div>`}</div>
+      ${llmBlock}
+      ${ftQueryBlock}
+    `;
+  }
+
+  // Demo banner toggle (lembrete colapsável "isso aqui é PoV").
+  const demoBanner = $("demo-banner");
+  $("demo-banner-toggle").addEventListener("click", () => {
+    const open = demoBanner.classList.toggle("open");
+    $("demo-banner-arrow").textContent = open ? "▲ recolher" : "▼ ver detalhes";
+  });
+
+  // Admin button
+  $("open-admin").addEventListener("click", () => window.open("/admin.html", "_blank"));
+
+  // Pill no header mostrando qual Redis tá conectado.
+  async function loadRedisPill() {
+    const pill = $("redis-pill");
+    const text = $("redis-pill-text");
+    try {
+      const r = await fetch("/api/redis/info");
+      const d = await r.json();
+      pill.classList.remove("cloud", "offline");
+      if (d.deployment === "redis_cloud") {
+        pill.classList.add("cloud");
+        text.textContent = d.region
+          ? `Redis Cloud · ${d.region} · v${d.version}`
+          : `Redis Cloud · v${d.version}`;
+      } else {
+        text.textContent = `Redis ${d.version} · local`;
+      }
+      pill.title = `${d.host}:${d.port} · ${d.modules.join(" · ")}`;
+    } catch {
+      pill.classList.add("offline");
+      $("redis-pill-text").textContent = "Redis offline";
+    }
+  }
+  loadRedisPill();
+
+  // Init: busca perfil + saldo real, foca o campo de busca.
+  loadAccount();
+  input.focus();
+})();
+</script>
+
+</body>
+</html>
