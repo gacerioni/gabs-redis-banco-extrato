@@ -410,6 +410,7 @@
           adminFetch("/api/redis/info"),
         ]);
       }
+      if (!statsR.ok) { showToast("Não autorizado", "danger"); return; }
       const [stats, redis] = [await statsR.json(), await redisR.json()];
       $("stat-tx").textContent = (stats.idx_transactions ?? 0).toLocaleString("pt-BR") + " docs";
       $("stat-sugg").textContent = (stats.dict_autocomplete ?? 0).toLocaleString("pt-BR") + " termos";
