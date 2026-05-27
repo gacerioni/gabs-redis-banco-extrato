@@ -379,11 +379,13 @@
   }
   // Prompt for key on first 401 response
   async function ensureAuth(resp) {
-    if (resp.status === 401 && !adminApiKey) {
+    if (resp.status !== 401) return false;
+    if (!adminApiKey) {
       const key = prompt("Admin API key required (X-Admin-Key):");
       if (key) { adminApiKey = key; sessionStorage.setItem("admin_api_key", key); return true; }
+      return false;
     }
-    return false;
+    return true; // key was set by another caller — retry with it
   }
 
   function showToast(text, kind = "success") {
