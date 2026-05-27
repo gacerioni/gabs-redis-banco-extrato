@@ -19,8 +19,11 @@ string Require(string name) =>
     ?? throw new InvalidOperationException(
         $"Missing env var: {name}. Set it in .env or via docker run -e {name}=...");
 
-string Optional(string name, string fallback) =>
-    Environment.GetEnvironmentVariable(name) ?? fallback;
+string Optional(string name, string fallback)
+{
+    var v = Environment.GetEnvironmentVariable(name);
+    return string.IsNullOrEmpty(v) ? fallback : v;
+}
 
 var redisUrl = Require("REDIS_URL");
 var openAiKey = Require("OPENAI_API_KEY");

@@ -432,7 +432,11 @@
 
   async function loadSettings() {
     try {
-      const r = await adminFetch("/api/admin/settings");
+      let r = await adminFetch("/api/admin/settings");
+      if (await ensureAuth(r)) {
+        r = await adminFetch("/api/admin/settings");
+      }
+      if (!r.ok) return;
       const d = await r.json();
       const slider = $("ttl-slider");
       slider.value = d.rewrite_ttl_sec;
