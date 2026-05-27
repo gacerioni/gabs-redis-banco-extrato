@@ -467,10 +467,17 @@
   $("save-settings").addEventListener("click", async () => {
     const ttl = parseInt($("ttl-slider").value, 10);
     try {
-      const r = await adminFetch("/api/admin/settings", {
+      let r = await adminFetch("/api/admin/settings", {
         method: "PUT",
         body: JSON.stringify({ rewrite_ttl_sec: ttl, default_mode: currentMode }),
       });
+      if (await ensureAuth(r)) {
+        r = await adminFetch("/api/admin/settings", {
+          method: "PUT",
+          body: JSON.stringify({ rewrite_ttl_sec: ttl, default_mode: currentMode }),
+        });
+      }
+      if (!r.ok) { showToast("Não autorizado", "danger"); return; }
       const d = await r.json();
       showToast(`Settings salvas: TTL=${fmtTtl(d.rewrite_ttl_sec)} · modo=${d.default_mode}`);
     } catch { showToast("Falha ao salvar", "danger"); }
@@ -480,7 +487,11 @@
   window.clearCache = async () => {
     if (!confirm("Limpar todas as entradas de rewrite cache?")) return;
     try {
-      const r = await adminFetch("/api/admin/clear-cache", { method: "POST" });
+      let r = await adminFetch("/api/admin/clear-cache", { method: "POST" });
+      if (await ensureAuth(r)) {
+        r = await adminFetch("/api/admin/clear-cache", { method: "POST" });
+      }
+      if (!r.ok) { showToast("Não autorizado", "danger"); return; }
       const d = await r.json();
       showToast(`${d.deleted} entries removidas — próximas queries vão re-chamar o LLM`);
       loadStats();
@@ -491,7 +502,11 @@
     if (!confirm("Apagar todas as transações e gerar novamente? (~30-40s)")) return;
     showToast("Re-seedando… aguarde 30-40s", "success");
     try {
-      const r = await adminFetch("/api/seed", { method: "POST" });
+      let r = await adminFetch("/api/seed", { method: "POST" });
+      if (await ensureAuth(r)) {
+        r = await adminFetch("/api/seed", { method: "POST" });
+      }
+      if (!r.ok) { showToast("Não autorizado", "danger"); return; }
       const d = await r.json();
       showToast(`Re-seed concluído: ${d.docsAdded} transações geradas`);
       loadStats();
