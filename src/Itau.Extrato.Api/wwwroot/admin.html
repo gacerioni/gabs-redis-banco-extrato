@@ -513,9 +513,8 @@
     } catch { showToast("Falha no re-seed (timeout? cheque os logs)", "danger"); }
   };
 
-  // Init
-  loadStats();
-  loadSettings();
+  // Init — serialize so loadStats prompts for key first, then loadSettings reuses it.
+  loadStats().then(() => loadSettings());
 })();
 </script>
 
