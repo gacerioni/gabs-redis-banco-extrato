@@ -385,7 +385,10 @@
       if (key) { adminApiKey = key; sessionStorage.setItem("admin_api_key", key); return true; }
       return false;
     }
-    return true; // key was set by another caller — retry with it
+    // Key was set but still got 401 — it's wrong/stale. Re-prompt.
+    const newKey = prompt("Admin API key rejected. Enter a new key (X-Admin-Key):");
+    if (newKey) { adminApiKey = newKey; sessionStorage.setItem("admin_api_key", newKey); return true; }
+    return false;
   }
 
   function showToast(text, kind = "success") {
