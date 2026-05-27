@@ -55,7 +55,12 @@ builder.Services.AddSingleton(sp => new SearchService(
     sp.GetRequiredService<LlmRewriter>(),
     sp.GetRequiredService<RewriteCache>()));
 
-builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+var allowedOrigins = Optional("CORS_ORIGINS", "https://extrato.platformengineer.io")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+    p.WithOrigins(allowedOrigins)
+     .AllowAnyMethod()
+     .AllowAnyHeader()));
 
 var app = builder.Build();
 app.UseCors();
@@ -110,6 +115,15 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// ---- Admin auth helper ----
+var adminKey = Environment.GetEnvironmentVariable("ADMIN_API_KEY");
+static bool IsAdmin(HttpContext ctx, string? adminKey)
+{
+    if (string.IsNullOrEmpty(adminKey)) return true; // not configured → open (dev)
+    return ctx.Request.Headers.TryGetValue("X-Admin-Key", out var val)
+        && val.FirstOrDefault() == adminKey;
+}
+
 // ---- Endpoints ----
 
 app.MapGet("/api/health", (RedisConnection redis) =>
@@ -119,7 +133,7 @@ app.MapGet("/api/health", (RedisConnection redis) =>
         var t = redis.Ping();
         return Results.Ok(new { status = "ok", redis_ping_ms = Math.Round(t.TotalMilliseconds, 2), service = "itau-extrato" });
     }
-    catch (Exception ex) { return Results.Json(new { status = "error", error = ex.Message }, statusCode: 503); }
+    catch { return Results.Json(new { status = "error", error = "Redis unavailable" }, statusCode: 503); }
 });
 
 // Perfil + saldo atual (computado da última tx com balance_after preenchido).
@@ -188,6 +202,9 @@ app.MapPost("/api/extrato/search", async (SearchRequest req, SearchService searc
     if (string.IsNullOrWhiteSpace(req.Query))
         return Results.BadRequest(new { error = "query is required" });
 
+    if (req.Query.Length > 500)
+        return Results.BadRequest(new { error = "query too long (max 500 chars)" });
+
     var userId = string.IsNullOrWhiteSpace(req.UserId) ? DemoProfiles.Gabriel.UserId : req.UserId.Trim();
     var query = req.Query.Trim();
     var limit = req.Limit is > 0 and <= 100 ? req.Limit.Value : 30;
@@ -245,7 +262,7 @@ app.MapPost("/api/extrato/search", async (SearchRequest req, SearchService searc
             items = Array.Empty<object>(),
             filter = (object?)null,
             metrics = timer.Build(mode: "error"),
-            error = ex.Message,
+            error = "An internal error occurred while processing your search.",
         });
     }
 });
@@ -255,14 +272,18 @@ app.MapPost("/api/extrato/search", async (SearchRequest req, SearchService searc
 // ============================================================
 
 // Detalhes do Redis conectado — exibe na UI ("Redis Cloud sa-east-1" / "Local 8.6.2").
-app.MapGet("/api/redis/info", async (RedisConnection redis) =>
+// Gated behind admin auth — exposes infrastructure details.
+app.MapGet("/api/redis/info", async (HttpContext ctx, RedisConnection redis) =>
 {
+    if (!IsAdmin(ctx, adminKey))
+        return Results.Json(new { error = "unauthorized" }, statusCode: 401);
+
     string host = "unknown", version = "?", deployment = "local";
     int port = 0;
     string? region = null;
     try
     {
-        var url = redis.ConnectionString;
+        var url = redisUrl;
         if (url.StartsWith("redis://", StringComparison.OrdinalIgnoreCase) ||
             url.StartsWith("rediss://", StringComparison.OrdinalIgnoreCase))
         {
@@ -313,8 +334,11 @@ app.MapGet("/api/redis/info", async (RedisConnection redis) =>
 });
 
 // Estatísticas pra UI/admin: contagens dos índices, cache, sinônimos.
-app.MapGet("/api/admin/stats", async (RewriteCache cache, RedisConnection redis) =>
+app.MapGet("/api/admin/stats", async (HttpContext ctx, RewriteCache cache, RedisConnection redis) =>
 {
+    if (!IsAdmin(ctx, adminKey))
+        return Results.Json(new { error = "unauthorized" }, statusCode: 401);
+
     long txCount = 0, suggCount = 0;
     long cacheCount = await cache.CountAsync();
     try
@@ -337,15 +361,23 @@ app.MapGet("/api/admin/stats", async (RewriteCache cache, RedisConnection redis)
 });
 
 // Settings em memória — admin altera live, sem rebuild.
-app.MapGet("/api/admin/settings", (AppSettings settings) =>
-    Results.Ok(new
+app.MapGet("/api/admin/settings", (HttpContext ctx, AppSettings settings) =>
+{
+    if (!IsAdmin(ctx, adminKey))
+        return Results.Json(new { error = "unauthorized" }, statusCode: 401);
+
+    return Results.Ok(new
     {
         rewrite_ttl_sec = (int)settings.RewriteTtl.TotalSeconds,
         default_mode = settings.DefaultMode,
-    }));
+    });
+});
 
-app.MapPut("/api/admin/settings", (UpdateSettingsRequest req, AppSettings settings) =>
+app.MapPut("/api/admin/settings", (HttpContext ctx, UpdateSettingsRequest req, AppSettings settings) =>
 {
+    if (!IsAdmin(ctx, adminKey))
+        return Results.Json(new { error = "unauthorized" }, statusCode: 401);
+
     if (req.RewriteTtlSec is > 0 and <= 86400)
         settings.RewriteTtl = TimeSpan.FromSeconds(req.RewriteTtlSec.Value);
     if (!string.IsNullOrWhiteSpace(req.DefaultMode))
@@ -358,8 +390,11 @@ app.MapPut("/api/admin/settings", (UpdateSettingsRequest req, AppSettings settin
 });
 
 // Wipe do cache de rewrite — útil pra demo "limpar cache → mostrar 1ª chamada lenta de novo".
-app.MapPost("/api/admin/clear-cache", async (RedisConnection redis) =>
+app.MapPost("/api/admin/clear-cache", async (HttpContext ctx, RedisConnection redis) =>
 {
+    if (!IsAdmin(ctx, adminKey))
+        return Results.Json(new { error = "unauthorized" }, statusCode: 401);
+
     var server = redis.Db.Multiplexer.GetServers().FirstOrDefault(s => s.IsConnected);
     if (server is null) return Results.Ok(new { deleted = 0 });
     long deleted = 0;
@@ -378,8 +413,11 @@ app.MapPost("/api/admin/clear-cache", async (RedisConnection redis) =>
 });
 
 // Forçar re-seed.
-app.MapPost("/api/seed", async (Seeder seeder) =>
+app.MapPost("/api/seed", async (HttpContext ctx, Seeder seeder) =>
 {
+    if (!IsAdmin(ctx, adminKey))
+        return Results.Json(new { error = "unauthorized" }, statusCode: 401);
+
     var report = await seeder.SeedAllAsync(force: true);
     return Results.Ok(report);
 });
