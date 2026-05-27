@@ -275,12 +275,10 @@ app.MapPost("/api/extrato/search", async (SearchRequest req, SearchService searc
 // ============================================================
 
 // Detalhes do Redis conectado — exibe na UI ("Redis Cloud sa-east-1" / "Local 8.6.2").
-// Gated behind admin auth — exposes infrastructure details.
-app.MapGet("/api/redis/info", async (HttpContext ctx, RedisConnection redis) =>
+// Public: index.html depends on this for the Redis pill. Info shown (version,
+// deployment, modules) is not sensitive for a PoV.
+app.MapGet("/api/redis/info", async (RedisConnection redis) =>
 {
-    if (!IsAdmin(ctx, adminKey))
-        return Results.Json(new { error = "unauthorized" }, statusCode: 401);
-
     string host = "unknown", version = "?", deployment = "local";
     int port = 0;
     string? region = null;
