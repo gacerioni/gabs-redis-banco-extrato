@@ -40,8 +40,10 @@ public static class QueryClassifier
             @"mais\s+de\s+r?\$?\s*\d|menos\s+de\s+r?\$?\s*\d|acima\s+de\s+r?\$?\s*\d|abaixo\s+de\s+r?\$?\s*\d|entre\s+r?\$?\s*\d.*?e\s+r?\$?\s*\d|" +
             // Tipos compostos
             @"fatura\s+(do|de)|cart[ãa]o\s+(de\s+cr[ée]dito|de\s+d[ée]bito)|conta\s+de\s+(luz|[áa]gua|internet|celular|telefone|g[áa]s)|" +
-            // Compras com qualificador
-            @"compras?\s+(parcelad|no\s+cr[ée]dito|no\s+d[ée]bito|do\s+m[êe]s)|" +
+            // Compras com qualificador — \w* nos sufixos pra match "parceladas" inteiro
+            // (o \b final do pattern exterior exigia boundary depois de "parcelad",
+            // que falhava com "parceladas" porque "a" é word char).
+            @"compras?\s+(parcelad\w*|no\s+cr[ée]dito|no\s+d[ée]bito|do\s+m[êe]s)|" +
             // Composições explícitas (queries que claramente envolvem mais que
             // 1 palavra-chave). Nomes simples como "salário", "investimento"
             // sozinhos vão pelo keyword path (FT.SEARCH + synonyms basta).

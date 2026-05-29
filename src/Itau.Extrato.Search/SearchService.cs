@@ -61,6 +61,26 @@ public sealed class SearchService
     }
 
     // ----------------------------------------------------------------------
+    // Baseline PING — uma chamada Redis trivial pra medir o RTT atômico
+    // antes do FT.SEARCH. Vira o "qual é a latência mais pura do Redis agora"
+    // no cockpit, independente da complexidade do search subsequente.
+    // Custo: <1ms em Redis local.
+    // ----------------------------------------------------------------------
+    private async Task MeasurePingBaselineAsync(StageTimer timer)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            await _redis.Db.PingAsync();
+        }
+        finally
+        {
+            sw.Stop();
+            timer.Record("redis.ping_baseline", sw.Elapsed.TotalMilliseconds, isRedis: true);
+        }
+    }
+
+    // ----------------------------------------------------------------------
     // SUGGEST — FT.SUGGET com FUZZY (sub-ms)
     // ----------------------------------------------------------------------
     public async Task<List<string>> SuggestAsync(string prefix, int max = 8, bool fuzzy = true, CancellationToken ct = default)
@@ -85,6 +105,7 @@ public sealed class SearchService
         StageTimer timer,
         CancellationToken ct = default)
     {
+        await MeasurePingBaselineAsync(timer);
         var safeQuery = EscapeText(query);
         var tokens = safeQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var textClause = tokens.Length switch
@@ -126,6 +147,8 @@ public sealed class SearchService
         StageTimer timer,
         CancellationToken ct = default)
     {
+        await MeasurePingBaselineAsync(timer);
+
         // 1) Cache check — barato (1 GET, <1ms)
         string? cachedJson;
         using (timer.RedisStage("rewrite.cache_get"))
@@ -235,6 +258,8 @@ public sealed class SearchService
         StageTimer timer,
         CancellationToken ct = default)
     {
+        await MeasurePingBaselineAsync(timer);
+
         float[] vec;
         using (timer.Stage("embed"))
             vec = await _embeddings.EmbedAsync(query, ct);

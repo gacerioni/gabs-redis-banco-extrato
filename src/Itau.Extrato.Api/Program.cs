@@ -107,6 +107,28 @@ using (var scope = app.Services.CreateScope())
         {
             log.LogError(ex, "Seed falhou. Verifique OPENAI_API_KEY e seeds dir.");
         }
+
+        // ---- Warmup: força StackExchange.Redis a abrir socket + RediSearch
+        // a carregar índice em RAM caches. Sem isso, a 1ª busca paga 100-1000ms
+        // de cold start e a UI mostra "Redis lento" injustamente. Pingamos 3x e
+        // rodamos um FT.SEARCH dummy. Soma ~10-50ms total de boot. Vale ouro.
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < 3; i++) await redis.Db.PingAsync();
+            try
+            {
+                var dummy = new Query("*").Limit(0, 1).Dialect(2);
+                await redis.Db.FT().SearchAsync(TransactionIndex.Name, dummy);
+            }
+            catch { /* índice talvez não exista ainda — tudo bem */ }
+            sw.Stop();
+            log.LogInformation("Redis multiplexer + FT.SEARCH warmup OK ({ms}ms)", Math.Round(sw.Elapsed.TotalMilliseconds, 1));
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Warmup falhou — primeira busca pode ficar lenta");
+        }
     }
 }
 
@@ -309,6 +331,52 @@ app.MapGet("/api/redis/info", async (RedisConnection redis) =>
         deployment,
         region,
         modules = new[] { "search", "json", "vectorset", "bloom", "timeseries" },
+    });
+});
+
+// Stats leves pra cockpit da UI (polling a cada 2s) — tudo via 1 PING + INFO.
+// Returns latencia atômica (PING), used_memory, num_docs no índice, dbsize.
+// Deliberadamente NÃO inclui rewrite_cache_entries (custa SCAN, vai pro /admin).
+app.MapGet("/api/redis/stats", async (RedisConnection redis) =>
+{
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    TimeSpan? ping = null;
+    try { ping = await redis.Db.PingAsync(); } catch { }
+    sw.Stop();
+
+    long numDocs = 0, dbsize = 0;
+    string? usedMemoryHuman = null;
+    try { var info = await redis.Db.FT().InfoAsync(TransactionIndex.Name); numDocs = info?.NumDocs ?? 0; } catch { }
+    try
+    {
+        var r = await redis.Db.ExecuteAsync("DBSIZE");
+        if (!r.IsNull) dbsize = (long)r;
+    }
+    catch { }
+    try
+    {
+        var raw = await redis.Db.ExecuteAsync("INFO", "memory");
+        if (!raw.IsNull)
+        {
+            foreach (var line in ((string)raw!).Split('\n'))
+            {
+                if (line.StartsWith("used_memory_human:", StringComparison.OrdinalIgnoreCase))
+                {
+                    usedMemoryHuman = line["used_memory_human:".Length..].Trim();
+                    break;
+                }
+            }
+        }
+    }
+    catch { }
+
+    return Results.Ok(new
+    {
+        ping_ms = ping is null ? (double?)null : Math.Round(ping.Value.TotalMilliseconds, 2),
+        wall_ms = Math.Round(sw.Elapsed.TotalMilliseconds, 2),
+        num_docs = numDocs,
+        dbsize,
+        used_memory_human = usedMemoryHuman,
     });
 });
 

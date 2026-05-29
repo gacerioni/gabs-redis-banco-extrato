@@ -553,6 +553,102 @@
   }
 
   .empty-telemetry { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; font-style: italic; }
+
+  /* ============================== Redis Cockpit ====================
+     Painel flutuante bottom-left que mostra latência atômica do Redis
+     em tempo real. Sempre visível durante a demo — vira o "speedômetro"
+     que prova que o Redis é rápido, independente do que a UI faz. */
+  .cockpit {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    width: 280px;
+    background: linear-gradient(180deg, #1A1A1F 0%, #0F0F12 100%);
+    color: #E8E8E8;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04);
+    z-index: 1000;
+    user-select: none;
+  }
+  .cockpit-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: #9A9AA0;
+  }
+  .cockpit-header .live-dot {
+    display: inline-flex; align-items: center; gap: 5px;
+    color: #3FE889;
+  }
+  .cockpit-header .live-dot::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: #3FE889; box-shadow: 0 0 6px #3FE889;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .cockpit-section { margin-bottom: 10px; }
+  .cockpit-section:last-child { margin-bottom: 0; }
+  .cockpit-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: #9A9AA0; margin-bottom: 4px;
+  }
+  .cockpit-headline {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 4px;
+  }
+  .cockpit-headline .value {
+    font-size: 28px; font-weight: 600; color: #3FE889;
+    transition: color 0.15s, transform 0.15s;
+    font-variant-numeric: tabular-nums;
+  }
+  .cockpit-headline .value.fast  { color: #3FE889; }   /* <5ms */
+  .cockpit-headline .value.ok    { color: #FFC857; }   /* 5-50ms */
+  .cockpit-headline .value.slow  { color: #FF6B6B; }   /* >50ms */
+  .cockpit-headline .value.pulse-now { transform: scale(1.05); }
+  .cockpit-headline .unit { font-size: 13px; color: #9A9AA0; font-weight: 400; }
+  .cockpit-headline .op { font-size: 11px; color: #6B6B70; margin-left: auto; }
+
+  .cockpit-sparkline { display: block; width: 100%; height: 22px; margin-top: 4px; }
+  .cockpit-sparkline rect { fill: #3FE889; opacity: 0.85; transition: opacity 0.2s; }
+  .cockpit-sparkline rect.ok   { fill: #FFC857; }
+  .cockpit-sparkline rect.slow { fill: #FF6B6B; }
+
+  .cockpit-baseline {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    font-size: 11px;
+  }
+  .cockpit-baseline .key { color: #9A9AA0; }
+  .cockpit-baseline .val { color: #E8E8E8; font-weight: 500; }
+
+  .cockpit-cache-badge {
+    display: inline-block; padding: 3px 8px;
+    border-radius: 4px; font-size: 10px;
+    font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+    background: rgba(63, 232, 137, 0.15); color: #3FE889;
+    border: 1px solid rgba(63, 232, 137, 0.3);
+  }
+  .cockpit-cache-badge.miss {
+    background: rgba(255, 200, 87, 0.12); color: #FFC857;
+    border-color: rgba(255, 200, 87, 0.3);
+  }
+  .cockpit-cache-badge.none { display: none; }
+
+  .cockpit-stats {
+    display: flex; justify-content: space-between; gap: 10px;
+    font-size: 10.5px; color: #9A9AA0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .cockpit-stats .stat { display: flex; align-items: baseline; gap: 4px; }
+  .cockpit-stats .stat .num { color: #E8E8E8; font-weight: 500; }
+
+  @media (max-width: 760px) {
+    .cockpit { left: 8px; right: 8px; width: auto; bottom: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -577,6 +673,34 @@
     </select>
   </div>
 </header>
+
+<!-- Cockpit: speedômetro do Redis sempre visível. Atualiza a cada busca. -->
+<aside class="cockpit" id="cockpit" aria-label="Redis live metrics">
+  <div class="cockpit-header">
+    <span>⚡ Redis Cockpit</span>
+    <span class="live-dot">LIVE</span>
+  </div>
+  <div class="cockpit-section">
+    <div class="cockpit-label">latência atômica</div>
+    <div class="cockpit-headline">
+      <span class="value none" id="cockpit-headline">—</span>
+      <span class="unit" id="cockpit-headline-unit">ms</span>
+      <span class="op" id="cockpit-op">FT.SEARCH</span>
+    </div>
+    <svg class="cockpit-sparkline" id="cockpit-spark" viewBox="0 0 100 22" preserveAspectRatio="none"></svg>
+  </div>
+  <div class="cockpit-baseline">
+    <span class="key">PING baseline</span>
+    <span class="val" id="cockpit-ping">— ms</span>
+  </div>
+  <div class="cockpit-section" id="cockpit-cache-row" style="margin-top: 8px;">
+    <span class="cockpit-cache-badge none" id="cockpit-cache-badge">cache miss</span>
+  </div>
+  <div class="cockpit-stats">
+    <span class="stat"><span class="num" id="cockpit-docs">—</span> docs</span>
+    <span class="stat"><span class="num" id="cockpit-mem">—</span></span>
+  </div>
+</aside>
 
 <div class="demo-banner" id="demo-banner">
   <button class="demo-banner-toggle" id="demo-banner-toggle">
@@ -861,12 +985,91 @@
       const data = await r.json();
       renderResults(data);
       renderTelemetry(data);
+      updateCockpit(data);
     } catch (e) {
       if (e.name !== "AbortError") {
         console.error(e);
         resultCount.textContent = "erro";
       }
     }
+  }
+
+  // ============================== Cockpit ==============================
+  // Atualiza o speedômetro flutuante a cada busca. A "latência atômica"
+  // mostrada é o stage `ft.search` (ou `ft.search.knn` em semantic) — a
+  // chamada Redis em si, sem soma de LLM/cache. Sparkline guarda últimas 20.
+  const cockpitHistory = [];
+  const COCKPIT_MAX_POINTS = 20;
+  function classifyLatency(ms) {
+    if (ms < 5) return "fast";
+    if (ms < 50) return "ok";
+    return "slow";
+  }
+  function updateCockpit(data) {
+    const stages = data.metrics?.stages || {};
+    const ftSearchMs = stages["ft.search"] ?? stages["ft.search.knn"];
+    const pingMs = stages["redis.ping_baseline"];
+    const fromCache = data.from_rewrite_cache === true;
+    const isLlmMode = data.mode === "nl_llm_rewrite";
+
+    // Headline: ft.search atômico. Em LLM uncached, mostra mesmo assim
+    // (esse é o tempo Redis real — LLM é externo).
+    if (typeof ftSearchMs === "number") {
+      const headline = $("cockpit-headline");
+      const cls = classifyLatency(ftSearchMs);
+      headline.className = `value ${cls} pulse-now`;
+      headline.textContent = ftSearchMs.toFixed(1);
+      setTimeout(() => headline.classList.remove("pulse-now"), 200);
+
+      $("cockpit-op").textContent = data.mode === "semantic_vss" ? "FT.SEARCH KNN" : "FT.SEARCH";
+
+      cockpitHistory.push(ftSearchMs);
+      if (cockpitHistory.length > COCKPIT_MAX_POINTS) cockpitHistory.shift();
+      renderSparkline();
+    }
+
+    if (typeof pingMs === "number") {
+      $("cockpit-ping").textContent = pingMs.toFixed(2) + " ms";
+    }
+
+    // Cache hit badge — só faz sentido em modo natural (cache de rewrite)
+    const badge = $("cockpit-cache-badge");
+    badge.className = "cockpit-cache-badge";
+    if (data.mode === "nl_cached_rewrite") {
+      badge.classList.add(""); // verde default
+      badge.textContent = "✨ cache hit — sem LLM";
+    } else if (isLlmMode) {
+      badge.classList.add("miss");
+      badge.textContent = "LLM rewrite (1ª vez)";
+    } else {
+      badge.classList.add("none");
+    }
+  }
+  function renderSparkline() {
+    const svg = $("cockpit-spark");
+    if (cockpitHistory.length === 0) { svg.innerHTML = ""; return; }
+    const max = Math.max(...cockpitHistory, 5);
+    const barWidth = 100 / COCKPIT_MAX_POINTS;
+    svg.innerHTML = cockpitHistory.map((v, i) => {
+      const h = Math.max(2, (v / max) * 20);
+      const x = i * barWidth + 0.3;
+      const y = 22 - h;
+      const cls = classifyLatency(v);
+      return `<rect class="${cls === "fast" ? "" : cls}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(barWidth - 0.6).toFixed(2)}" height="${h.toFixed(2)}" rx="0.5" />`;
+    }).join("");
+  }
+  // Stats periódicos (doc count + memory) — barato, atualiza a cada 5s.
+  async function pollRedisStats() {
+    try {
+      const r = await fetch("/api/redis/stats");
+      const s = await r.json();
+      if (typeof s.num_docs === "number") {
+        $("cockpit-docs").textContent = s.num_docs.toLocaleString("pt-BR");
+      }
+      if (s.used_memory_human) {
+        $("cockpit-mem").textContent = s.used_memory_human;
+      }
+    } catch { /* silent */ }
   }
 
   function renderResults(data) {
@@ -1032,6 +1235,10 @@
   // Init: busca perfil + saldo real, foca o campo de busca.
   loadAccount();
   input.focus();
+
+  // Cockpit: stats imediato + refresh a cada 5s (num_docs + memory).
+  pollRedisStats();
+  setInterval(pollRedisStats, 5000);
 })();
 </script>
 
