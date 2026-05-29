@@ -352,6 +352,100 @@
     gap: 16px;
     transition: background 0.1s;
   }
+  /* Fade-in suave dos resultados — chega "deslizando" no lugar do skeleton */
+  .tx-row.entered { animation: txEnter 0.32s ease-out both; }
+  @keyframes txEnter {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Skeleton rows que aparecem enquanto a busca está em andamento.
+     Shimmer animation dá sensação de "carregando" sem mentir sobre o progresso. */
+  .skel-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 140px;
+    align-items: center;
+    padding: 14px 22px;
+    border-bottom: 1px solid #F5F5F5;
+    gap: 16px;
+  }
+  .skel-bar {
+    height: 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #F0F0F0 0%, #E0E0E0 50%, #F0F0F0 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+  .skel-bar.short { width: 60%; }
+  .skel-bar.medium { width: 85%; }
+  .skel-bar.tall { height: 14px; }
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Estágio de progresso visível durante LLM rewrite (2-3s OpenAI).
+     Aparece em cima da lista de skeleton; some quando os resultados chegam. */
+  .stage-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--itau-orange-bg);
+    color: var(--itau-orange-dark);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--itau-orange-light);
+    font-family: var(--mono);
+  }
+  .stage-pill .spin {
+    width: 10px; height: 10px;
+    border: 2px solid var(--itau-orange-light);
+    border-top-color: var(--itau-orange);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast dramatic pra cache hit — flash verde no canto direito quando
+     2ª chamada bate o cache do rewrite. O momento "ahá" da demo. */
+  .cache-toast {
+    position: fixed;
+    top: 80px;
+    right: 16px;
+    background: linear-gradient(135deg, #16A34A 0%, #15803D 100%);
+    color: white;
+    padding: 14px 18px;
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(22, 163, 74, 0.35), 0 0 0 1px rgba(255,255,255,0.1);
+    font-family: var(--mono);
+    font-size: 13px;
+    z-index: 2000;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+    max-width: 340px;
+  }
+  .cache-toast.show { transform: translateX(0); opacity: 1; }
+  .cache-toast .toast-title {
+    font-weight: 600; font-size: 15px;
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .cache-toast .speedup {
+    display: flex; align-items: baseline; gap: 8px;
+    margin: 4px 0;
+  }
+  .cache-toast .speedup .num {
+    font-size: 28px; font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .cache-toast .speedup .unit { font-size: 13px; opacity: 0.85; }
+  .cache-toast .sub {
+    font-size: 11px; opacity: 0.85; margin-top: 6px;
+    line-height: 1.4;
+  }
   .tx-row:hover { background: #FAFAFA; }
   .tx-row:last-child { border-bottom: none; }
   .tx-date {
@@ -975,6 +1069,9 @@
     if (searchController) searchController.abort();
     searchController = new AbortController();
     resultCount.textContent = "buscando…";
+    renderSkeleton();
+    // Se demorar >300ms, mostra pill "consultando LLM" (vai aparecer em natural mode).
+    const stageTimer = setTimeout(() => showStagePill("🧠 LLM analisando a pergunta…"), 300);
     try {
       const r = await fetch("/api/extrato/search", {
         method: "POST",
@@ -982,16 +1079,52 @@
         body: JSON.stringify({ query, user_id: currentUser(), limit: 50 }),
         signal: searchController.signal,
       });
+      clearTimeout(stageTimer);
       const data = await r.json();
+      hideStagePill();
       renderResults(data);
       renderTelemetry(data);
       updateCockpit(data);
     } catch (e) {
+      clearTimeout(stageTimer);
+      hideStagePill();
       if (e.name !== "AbortError") {
         console.error(e);
         resultCount.textContent = "erro";
       }
     }
+  }
+
+  // Render skeleton rows enquanto a busca está em andamento.
+  // 6 linhas com larguras variadas pra parecer texto real.
+  function renderSkeleton() {
+    const widths = ["medium", "short", "medium", "tall", "short", "medium"];
+    results.innerHTML = widths.map(w => `
+      <div class="skel-row">
+        <div class="skel-bar short" style="height:10px;"></div>
+        <div>
+          <div class="skel-bar ${w}"></div>
+          <div class="skel-bar short" style="margin-top:6px; height:9px;"></div>
+        </div>
+        <div class="skel-bar tall" style="margin-left:auto; width:90px;"></div>
+      </div>
+    `).join("");
+  }
+  function showStagePill(text) {
+    const card = document.querySelector(".results-card .results-header");
+    if (!card) return;
+    let pill = document.getElementById("stage-pill");
+    if (!pill) {
+      pill = document.createElement("span");
+      pill.id = "stage-pill";
+      pill.className = "stage-pill";
+      card.appendChild(pill);
+    }
+    pill.innerHTML = `<span class="spin"></span><span>${text}</span>`;
+  }
+  function hideStagePill() {
+    const pill = document.getElementById("stage-pill");
+    if (pill) pill.remove();
   }
 
   // ============================== Cockpit ==============================
@@ -1000,6 +1133,32 @@
   // chamada Redis em si, sem soma de LLM/cache. Sparkline guarda últimas 20.
   const cockpitHistory = [];
   const COCKPIT_MAX_POINTS = 20;
+  // Guarda última latência de LLM (uncached) por query — quando o cache bate
+  // na 2ª chamada, calculamos speedup vs a 1ª.
+  const lastUncachedByQuery = new Map();
+
+  function showCacheToast(query, prevMs, nowMs) {
+    const speedup = prevMs && nowMs ? Math.round(prevMs / nowMs) : 0;
+    let toast = document.getElementById("cache-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "cache-toast";
+      toast.className = "cache-toast";
+      document.body.appendChild(toast);
+    }
+    toast.innerHTML = `
+      <div class="toast-title">✨ Cache hit no Redis</div>
+      <div class="speedup">
+        <span class="num">${speedup.toLocaleString("pt-BR")}×</span>
+        <span class="unit">mais rápido</span>
+      </div>
+      <div class="sub">${prevMs.toFixed(0)} ms (LLM 1ª vez) → <b>${nowMs.toFixed(1)} ms</b> · evitou chamada OpenAI</div>
+    `;
+    // Força reflow antes de animar
+    requestAnimationFrame(() => toast.classList.add("show"));
+    clearTimeout(showCacheToast._t);
+    showCacheToast._t = setTimeout(() => toast.classList.remove("show"), 5500);
+  }
   function classifyLatency(ms) {
     if (ms < 5) return "fast";
     if (ms < 50) return "ok";
@@ -1038,9 +1197,20 @@
     if (data.mode === "nl_cached_rewrite") {
       badge.classList.add(""); // verde default
       badge.textContent = "✨ cache hit — sem LLM";
+
+      // Toast dramático com speedup vs 1ª chamada (se tivermos baseline)
+      const totalNow = data.metrics?.total_ms ?? 0;
+      const prevMs = lastUncachedByQuery.get(data.query);
+      if (prevMs && totalNow > 0 && prevMs > totalNow * 3) {
+        showCacheToast(data.query, prevMs, totalNow);
+      }
     } else if (isLlmMode) {
       badge.classList.add("miss");
       badge.textContent = "LLM rewrite (1ª vez)";
+      // Memoriza a latência uncached pra calcular speedup quando vier o cache
+      if (data.metrics?.total_ms) {
+        lastUncachedByQuery.set(data.query, data.metrics.total_ms);
+      }
     } else {
       badge.classList.add("none");
     }
@@ -1075,21 +1245,26 @@
   function renderResults(data) {
     const items = data.items || [];
     if (items.length === 0) {
+      // Empty state com sugestões úteis em vez de "nada encontrado" seco.
       results.innerHTML = `
         <div class="empty-state">
-          <h4>nada encontrado</h4>
-          <p>tente reformular ou usar um dos atalhos acima.</p>
+          <h4>nada encontrado pra "${escapeHtml(data.query || '')}"</h4>
+          <p>tenta reformular, ou clica num atalho de exemplo acima:</p>
+          <p style="margin-top:8px;">
+            <code>uber</code> · <code>luz</code> · <code>salário</code> ·
+            <code>pix recebido</code> · <code>compras parceladas</code>
+          </p>
         </div>`;
       resultCount.textContent = "0 lançamentos";
       return;
     }
     resultCount.textContent = `${data.total_results} lançament${data.total_results === 1 ? "o" : "os"}`;
-    results.innerHTML = items.map(it => {
+    results.innerHTML = items.map((it, idx) => {
       const isCredit = it.amountBrl > 0 || it.direction === "inbound";
       const dt = fmtDateTime(it.dateUnix);
       const installmentPill = it.installment ? `<span class="pill parc">parc ${it.installment}</span>` : "";
       return `
-        <div class="tx-row">
+        <div class="tx-row entered" style="animation-delay: ${Math.min(idx * 18, 200)}ms">
           <div class="tx-date">
             <span class="day">${dt.day}</span>
             <span>${dt.monthYear}</span>
