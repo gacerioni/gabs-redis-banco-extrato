@@ -130,7 +130,7 @@ public static class TransactionFactory
             }
 
             // ---- Delivery (iFood/Rappi) -----------------------------------
-            int deliveryCount = 8 + rng.Next(0, 8) + (lifeMul - 1) * 2;
+            int deliveryCount = 12 + rng.Next(0, 10) + (lifeMul - 1) * 2;
             for (int i = 0; i < deliveryCount; i++)
             {
                 var day = rng.Next(1, daysInMonth + 1);
@@ -152,7 +152,7 @@ public static class TransactionFactory
             }
 
             // ---- Transporte (Uber/99/posto) -------------------------------
-            int transportCount = 6 + rng.Next(0, 8);
+            int transportCount = 10 + rng.Next(0, 10);
             for (int i = 0; i < transportCount; i++)
             {
                 var day = rng.Next(1, daysInMonth + 1);
@@ -176,7 +176,7 @@ public static class TransactionFactory
             }
 
             // ---- Compras online médias ------------------------------------
-            int shoppingCount = 3 + rng.Next(0, 4);
+            int shoppingCount = 5 + rng.Next(0, 6);
             for (int i = 0; i < shoppingCount; i++)
             {
                 var day = rng.Next(1, daysInMonth + 1);
@@ -196,8 +196,8 @@ public static class TransactionFactory
                     currentBalance: balance, affectsBalance: false);
             }
 
-            // ---- Parcelado (1-2 por mês) ----------------------------------
-            int parceladoCount = rng.Next(0, 3);
+            // ---- Parcelado (1-4 por mês — bump pra deixar a query "compras parceladas" rica) -
+            int parceladoCount = 1 + rng.Next(0, 4);
             for (int i = 0; i < parceladoCount; i++)
             {
                 var day = rng.Next(1, daysInMonth + 1);
@@ -240,11 +240,12 @@ public static class TransactionFactory
                     category: TransactionCategory.Transferencias,
                     channel: TransactionChannel.AppMobile,
                     installment: null,
-                    currentBalance: balance, affectsBalance: true);
+                    currentBalance: balance, affectsBalance: true,
+                    pixMessage: MaybePixMemo(rng, 0.4));  // 40% nos Pix da esposa — relação próxima, memos comuns
             }
 
             // Resto dos Pix: weighted random como antes.
-            int pixCount = 4 + rng.Next(0, 5);
+            int pixCount = 6 + rng.Next(0, 8);
             for (int i = 0; i < pixCount; i++)
             {
                 var day = rng.Next(1, daysInMonth + 1);
@@ -274,7 +275,8 @@ public static class TransactionFactory
                     category: TransactionCategory.Transferencias,
                     channel: TransactionChannel.AppMobile,
                     installment: null,
-                    currentBalance: balance, affectsBalance: true);
+                    currentBalance: balance, affectsBalance: true,
+                    pixMessage: MaybePixMemo(rng, 0.30));  // 30% dos Pix variáveis têm memo
             }
 
             // ---- Saúde (farmácia, eventual) -------------------------------
@@ -505,6 +507,34 @@ public static class TransactionFactory
     private static T PickRandom<T>(Random rng, IList<T> list) => list[rng.Next(list.Count)];
 
     private static decimal Round2(decimal x) => Math.Round(x, 2, MidpointRounding.AwayFromZero);
+
+    // Memos genéricos pra Pix — populados aleatoriamente em ~30% dos Pix
+    // pra demonstrar que o campo pix_message é indexado e pesquisável via FT.SEARCH
+    // (não só os do easter egg do Morenão).
+    private static readonly string[] PixMemosCommon =
+    {
+        "racha do almoço",
+        "uber compartilhado",
+        "rateio da pizza",
+        "cota do churrasco",
+        "café e pão de queijo",
+        "presente de aniversário",
+        "fatura do clube",
+        "vaquinha aniversário galera",
+        "valeu pelo café",
+        "babá da semana",
+        "fiquei devendo",
+        "obrigado!",
+        "almoço de domingo",
+        "rateio happy hour",
+        "passagem combinada",
+        "doação amiga",
+        "ingresso show",
+        "fica devendo agora você",
+    };
+
+    private static string? MaybePixMemo(Random rng, double probability = 0.30)
+        => rng.NextDouble() < probability ? PixMemosCommon[rng.Next(PixMemosCommon.Length)] : null;
 
     private static string ToTitleCase(string upper)
     {

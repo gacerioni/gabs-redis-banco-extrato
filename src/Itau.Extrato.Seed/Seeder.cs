@@ -68,21 +68,41 @@ public sealed class Seeder
         var sw = Stopwatch.StartNew();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var all = new List<Transaction>();
+        // Todos os 4 profiles cobrem 12 meses pra ter massa pras queries de
+        // "ano passado" / "mês X". Antes Miller/Camila/Pedro tinham só 3-6mo,
+        // o que deixava a demo ralinha em filtros temporais largos.
         all.AddRange(TransactionFactory.Generate(DemoProfiles.Gabriel, today.AddMonths(-11), months: 12, seed: 42));
-        all.AddRange(TransactionFactory.Generate(DemoProfiles.Miller,  today.AddMonths(-5),  months: 6,  seed: 84));
-        all.AddRange(TransactionFactory.Generate(DemoProfiles.Camila,  today.AddMonths(-2),  months: 3,  seed: 168));
-        all.AddRange(TransactionFactory.Generate(DemoProfiles.Pedro,   today.AddMonths(-2),  months: 3,  seed: 336));
+        all.AddRange(TransactionFactory.Generate(DemoProfiles.Miller,  today.AddMonths(-11), months: 12, seed: 84));
+        all.AddRange(TransactionFactory.Generate(DemoProfiles.Camila,  today.AddMonths(-11), months: 12, seed: 168));
+        all.AddRange(TransactionFactory.Generate(DemoProfiles.Pedro,   today.AddMonths(-11), months: 12, seed: 336));
         var generateMs = sw.Elapsed.TotalMilliseconds;
 
         // 2. Build text to embed (descrição + counterparty + categoria pra ter contexto semântico amplo)
         sw.Restart();
         var embedTexts = all.Select(t => $"{t.Description} | {t.CounterpartyName ?? ""} | {t.Category} | {t.Type}").ToList();
-        var embeddings = new List<float[]>(all.Count);
+        // Paralelizar batches de embedding — antes era sequencial e 4-5x mais
+        // lento. OpenAI aguenta múltiplas requests concorrentes; cap em 5
+        // simultâneas pra ficar abaixo do rate-limit conservador.
+        const int EmbedConcurrency = 5;
+        var embeddings = new float[all.Count][];
+        var batches = new List<(int Start, List<string> Texts)>();
         for (int i = 0; i < embedTexts.Count; i += EmbedBatchSize)
         {
-            var chunk = embedTexts.Skip(i).Take(EmbedBatchSize).ToList();
-            var vecs = await _embeddings.EmbedManyAsync(chunk, ct);
-            embeddings.AddRange(vecs);
+            batches.Add((i, embedTexts.Skip(i).Take(EmbedBatchSize).ToList()));
+        }
+        using (var sem = new SemaphoreSlim(EmbedConcurrency))
+        {
+            var tasks = batches.Select(async b =>
+            {
+                await sem.WaitAsync(ct);
+                try
+                {
+                    var vecs = await _embeddings.EmbedManyAsync(b.Texts, ct);
+                    for (int j = 0; j < vecs.Count; j++) embeddings[b.Start + j] = vecs[j];
+                }
+                finally { sem.Release(); }
+            });
+            await Task.WhenAll(tasks);
         }
         var embedMs = sw.Elapsed.TotalMilliseconds;
 
