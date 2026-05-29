@@ -697,9 +697,9 @@
     transition: color 0.15s, transform 0.15s;
     font-variant-numeric: tabular-nums;
   }
-  .cockpit-headline .value.fast  { color: #3FE889; }   /* <5ms */
-  .cockpit-headline .value.ok    { color: #FFC857; }   /* 5-50ms */
-  .cockpit-headline .value.slow  { color: #FF6B6B; }   /* >50ms */
+  .cockpit-headline .value.fast  { color: #3FE889; }   /* <25ms — Redis no seu habitat */
+  .cockpit-headline .value.ok    { color: #FFC857; }   /* 25-150ms — provavelmente cold cache ou KNN grande */
+  .cockpit-headline .value.slow  { color: #FF6B6B; }   /* >150ms — algo tá errado */
   .cockpit-headline .value.pulse-now { transform: scale(1.05); }
   .cockpit-headline .unit { font-size: 13px; color: #9A9AA0; font-weight: 400; }
   .cockpit-headline .op { font-size: 11px; color: #6B6B70; margin-left: auto; }
@@ -855,8 +855,8 @@
         <div class="suggest-dropdown" id="suggest"></div>
       </div>
       <div class="golden-paths">
-        <button class="golden-chip" data-q="piques pra Dua esse mês">piques pra Dua esse mês</button>
         <button class="golden-chip" data-q="uber">uber</button>
+        <button class="golden-chip" data-q="piques pra Dua esse mês">piques pra Dua esse mês</button>
         <button class="golden-chip" data-q="luz">luz</button>
         <button class="golden-chip" data-q="quanto gastei com ifood no mês passado?">quanto gastei com ifood no mês passado?</button>
         <button class="golden-chip" data-q="compras parceladas">compras parceladas</button>
@@ -1160,8 +1160,12 @@
     showCacheToast._t = setTimeout(() => toast.classList.remove("show"), 5500);
   }
   function classifyLatency(ms) {
-    if (ms < 5) return "fast";
-    if (ms < 50) return "ok";
+    // Thresholds calibrados pro Redis 8 OSS em VM moderna:
+    //   <25ms  = território normal do Redis (FT.SEARCH, FT.SUGGET, JSON.GET, KNN)
+    //   <150ms = cold cache, KNN com K grande, ou network ruim — ainda OK
+    //   acima  = algo realmente quebrado ou WAN-distant Redis
+    if (ms < 25) return "fast";
+    if (ms < 150) return "ok";
     return "slow";
   }
   function updateCockpit(data) {
