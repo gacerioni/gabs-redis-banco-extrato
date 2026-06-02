@@ -41,23 +41,51 @@ public sealed class Seeder
     {
         var db = _redis.Db;
 
-        // Quando force=true, dropar o índice tb — schema pode ter mudado
-        // (ex: adição do TEXT field pix_message). Recriação garante que o
-        // novo schema entre em efeito sem precisar de FT.ALTER manual.
-        if (force)
-        {
-            await TransactionIndex.DropAsync(db, keepDocs: false);
-            await SuggestionIndex.ClearAsync(db);
-        }
-
+        // Garante que o índice exista antes de qualquer check — staleness
+        // detector logo abaixo precisa rodar FT.SEARCH no idx.
         await TransactionIndex.EnsureCreatedAsync(db, _embeddings.Dim);
 
         var existing = await CountDocsAsync(db, TransactionIndex.Name);
+        string staleReason = "";
+
+        // Auto-detect staleness: se a transação mais nova é de antes do mês
+        // atual, força re-seed. Caso típico: container fica no ar por semanas
+        // e queries "esse mês" / "esta semana" começam a voltar vazio porque
+        // o seed congelou no mês em que foi rodado.
+        if (!force && existing > 0)
+        {
+            try
+            {
+                var sr = await db.FT().SearchAsync(TransactionIndex.Name,
+                    new NRedisStack.Search.Query("*")
+                        .ReturnFields("date")
+                        .SetSortBy("date", ascending: false)
+                        .Limit(0, 1));
+                if (sr.Documents.Count > 0)
+                {
+                    var maxDate = DateTimeOffset.FromUnixTimeSeconds((long)sr.Documents[0]["date"]);
+                    var nowBrt = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-3));
+                    var startOfMonth = new DateTimeOffset(nowBrt.Year, nowBrt.Month, 1, 0, 0, 0, TimeSpan.FromHours(-3));
+                    if (maxDate < startOfMonth)
+                    {
+                        force = true;
+                        staleReason = $"auto re-seed (max date {maxDate:yyyy-MM-dd} < início do mês {startOfMonth:yyyy-MM-dd})";
+                    }
+                }
+            }
+            catch { /* se não der pra ler, deixa o caminho normal — não força wipe à toa */ }
+        }
+
         if (existing > 0 && !force)
             return new SeedReport(existing, 0, "skipped (already populated)", 0, 0);
 
         if (force)
         {
+            // Schema pode ter mudado (ex: pix_message foi adicionado como TEXT)
+            // ou ser re-seed por staleness — qualquer caso, dropa e recria.
+            await TransactionIndex.DropAsync(db, keepDocs: false);
+            await SuggestionIndex.ClearAsync(db);
+            await TransactionIndex.EnsureCreatedAsync(db, _embeddings.Dim);
             await DeletePrefixAsync(db, TransactionIndex.Prefix);
         }
 
@@ -137,10 +165,11 @@ public sealed class Seeder
         await ApplySynonymsAsync(db, ct);
         var synMs = sw.Elapsed.TotalMilliseconds;
 
+        var notePrefix = string.IsNullOrEmpty(staleReason) ? "" : staleReason + " · ";
         return new SeedReport(
             DocsBefore: existing,
             DocsAdded: withEmb.Count,
-            Note: $"generate={generateMs:F0}ms · embed={embedMs:F0}ms · write={writeMs:F0}ms · sugadd={sugMs:F0}ms · synupdate={synMs:F0}ms",
+            Note: $"{notePrefix}generate={generateMs:F0}ms · embed={embedMs:F0}ms · write={writeMs:F0}ms · sugadd={sugMs:F0}ms · synupdate={synMs:F0}ms",
             AutocompleteTerms: 0,
             SynonymGroups: 0);
     }
