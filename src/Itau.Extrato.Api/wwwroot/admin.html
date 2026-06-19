@@ -366,6 +366,31 @@
   const $ = id => document.getElementById(id);
   const toast = $("toast");
 
+  // Admin API key — read from sessionStorage or prompt once per tab.
+  let adminApiKey = sessionStorage.getItem("admin_api_key") || "";
+  function adminHeaders() {
+    const h = { "Content-Type": "application/json" };
+    if (adminApiKey) h["X-Admin-Key"] = adminApiKey;
+    return h;
+  }
+  function adminFetch(url, opts = {}) {
+    opts.headers = { ...adminHeaders(), ...(opts.headers || {}) };
+    return fetch(url, opts);
+  }
+  // Prompt for key on first 401 response
+  async function ensureAuth(resp) {
+    if (resp.status !== 401) return false;
+    if (!adminApiKey) {
+      const key = prompt("Admin API key required (X-Admin-Key):");
+      if (key) { adminApiKey = key; sessionStorage.setItem("admin_api_key", key); return true; }
+      return false;
+    }
+    // Key was set but still got 401 — it's wrong/stale. Re-prompt.
+    const newKey = prompt("Admin API key rejected. Enter a new key (X-Admin-Key):");
+    if (newKey) { adminApiKey = newKey; sessionStorage.setItem("admin_api_key", newKey); return true; }
+    return false;
+  }
+
   function showToast(text, kind = "success") {
     toast.textContent = text;
     toast.className = "toast show " + kind;
@@ -375,10 +400,18 @@
   // ----------- Stats -----------
   async function loadStats() {
     try {
-      const [stats, redis] = await Promise.all([
-        fetch("/api/admin/stats").then(r => r.json()),
-        fetch("/api/redis/info").then(r => r.json()),
+      let [statsR, redisR] = await Promise.all([
+        adminFetch("/api/admin/stats"),
+        adminFetch("/api/redis/info"),
       ]);
+      if (await ensureAuth(statsR) || await ensureAuth(redisR)) {
+        [statsR, redisR] = await Promise.all([
+          adminFetch("/api/admin/stats"),
+          adminFetch("/api/redis/info"),
+        ]);
+      }
+      if (!statsR.ok) { showToast("Não autorizado", "danger"); return; }
+      const [stats, redis] = [await statsR.json(), await redisR.json()];
       $("stat-tx").textContent = (stats.idx_transactions ?? 0).toLocaleString("pt-BR") + " docs";
       $("stat-sugg").textContent = (stats.dict_autocomplete ?? 0).toLocaleString("pt-BR") + " termos";
       const cacheEntries = stats.rewrite_cache_entries ?? 0;
@@ -405,7 +438,11 @@
 
   async function loadSettings() {
     try {
-      const r = await fetch("/api/admin/settings");
+      let r = await adminFetch("/api/admin/settings");
+      if (await ensureAuth(r)) {
+        r = await adminFetch("/api/admin/settings");
+      }
+      if (!r.ok) return;
       const d = await r.json();
       const slider = $("ttl-slider");
       slider.value = d.rewrite_ttl_sec;
@@ -431,11 +468,17 @@
   $("save-settings").addEventListener("click", async () => {
     const ttl = parseInt($("ttl-slider").value, 10);
     try {
-      const r = await fetch("/api/admin/settings", {
+      let r = await adminFetch("/api/admin/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rewrite_ttl_sec: ttl, default_mode: currentMode }),
       });
+      if (await ensureAuth(r)) {
+        r = await adminFetch("/api/admin/settings", {
+          method: "PUT",
+          body: JSON.stringify({ rewrite_ttl_sec: ttl, default_mode: currentMode }),
+        });
+      }
+      if (!r.ok) { showToast("Não autorizado", "danger"); return; }
       const d = await r.json();
       showToast(`Settings salvas: TTL=${fmtTtl(d.rewrite_ttl_sec)} · modo=${d.default_mode}`);
     } catch { showToast("Falha ao salvar", "danger"); }
@@ -445,7 +488,11 @@
   window.clearCache = async () => {
     if (!confirm("Limpar todas as entradas de rewrite cache?")) return;
     try {
-      const r = await fetch("/api/admin/clear-cache", { method: "POST" });
+      let r = await adminFetch("/api/admin/clear-cache", { method: "POST" });
+      if (await ensureAuth(r)) {
+        r = await adminFetch("/api/admin/clear-cache", { method: "POST" });
+      }
+      if (!r.ok) { showToast("Não autorizado", "danger"); return; }
       const d = await r.json();
       showToast(`${d.deleted} entries removidas — próximas queries vão re-chamar o LLM`);
       loadStats();
@@ -456,16 +503,19 @@
     if (!confirm("Apagar todas as transações e gerar novamente? (~30-40s)")) return;
     showToast("Re-seedando… aguarde 30-40s", "success");
     try {
-      const r = await fetch("/api/seed", { method: "POST" });
+      let r = await adminFetch("/api/seed", { method: "POST" });
+      if (await ensureAuth(r)) {
+        r = await adminFetch("/api/seed", { method: "POST" });
+      }
+      if (!r.ok) { showToast("Não autorizado", "danger"); return; }
       const d = await r.json();
       showToast(`Re-seed concluído: ${d.docsAdded} transações geradas`);
       loadStats();
     } catch { showToast("Falha no re-seed (timeout? cheque os logs)", "danger"); }
   };
 
-  // Init
-  loadStats();
-  loadSettings();
+  // Init — serialize so loadStats prompts for key first, then loadSettings reuses it.
+  loadStats().then(() => loadSettings());
 })();
 </script>
 

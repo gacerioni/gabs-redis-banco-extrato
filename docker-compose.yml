@@ -45,6 +45,8 @@ services:
       ASPNETCORE_URLS: http://+:5218
       REDIS_URL: redis://redis:6379
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set in your shell or .env file}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
 
 volumes:
   redis-data:

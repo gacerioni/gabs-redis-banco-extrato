@@ -9,7 +9,7 @@ namespace Itau.Extrato.Search.Infra;
 public sealed class RedisConnection : IDisposable
 {
     private readonly Lazy<ConnectionMultiplexer> _muxer;
-    public string ConnectionString { get; }
+    internal string ConnectionString { get; }
 
     public RedisConnection(string connectionString)
     {
